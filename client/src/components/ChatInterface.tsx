@@ -5,8 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Mic, Settings, HelpCircle, Menu, Plus } from 'lucide-react';
-import type { Message, Bot, ChatMessage, LearningUpdate } from '@shared/schema';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import type { Message, Bot, LearningUpdate } from '@shared/schema';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatInterfaceProps {
@@ -30,28 +29,49 @@ export function ChatInterface({
   const [newWords, setNewWords] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { sendMessage, isConnected } = useWebSocket((message: ChatMessage) => {
-    if (message.type === 'bot_response') {
-      const botMessage: Message = {
-        id: Date.now(),
-        botId: bot.id,
-        content: message.content!,
-        isUser: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-    } else if (message.type === 'learning_update') {
-      const update = message.data as LearningUpdate;
-      setNewWords(update.newWords);
-      onLearningUpdate(update);
+  // Temporarily use HTTP requests instead of WebSocket
+  const [isConnected, setIsConnected] = useState(true);
+  
+  const sendMessage = async (userMessage: string) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          botId: bot.id,
+          content: userMessage
+        })
+      });
       
-      // Clear new words after showing them briefly
-      setTimeout(() => setNewWords([]), 3000);
-    } else if (message.type === 'milestone_achieved') {
-      onMilestoneAchieved();
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Add bot response
+        const botMessage: Message = {
+          id: Date.now() + 1,
+          botId: bot.id,
+          content: result.response,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+        
+        // Handle learning updates
+        if (result.learningUpdate) {
+          setNewWords(result.learningUpdate.newWords);
+          onLearningUpdate(result.learningUpdate);
+          setTimeout(() => setNewWords([]), 3000);
+        }
+        
+        // Handle milestones
+        if (result.milestoneAchieved) {
+          onMilestoneAchieved();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
-  });
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -61,7 +81,7 @@ export function ChatInterface({
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!inputValue.trim() || isTyping || !isConnected) return;
@@ -76,15 +96,13 @@ export function ChatInterface({
     };
     setMessages(prev => [...prev, userMessage]);
     
-    // Send to WebSocket
-    sendMessage({
-      type: 'user_message',
-      content: inputValue,
-      botId: bot.id
-    });
-    
+    const messageContent = inputValue;
     setInputValue('');
     setIsTyping(true);
+    
+    // Send to server
+    await sendMessage(messageContent);
+    setIsTyping(false);
   };
 
   const suggestionChips = [

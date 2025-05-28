@@ -11,6 +11,12 @@ export function useWebSocket(onMessage?: (message: ChatMessage) => void): UseWeb
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<ChatMessage | null>(null);
   const ws = useRef<WebSocket | null>(null);
+  const onMessageRef = useRef(onMessage);
+
+  // Update the ref when onMessage changes
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -27,7 +33,7 @@ export function useWebSocket(onMessage?: (message: ChatMessage) => void): UseWeb
       try {
         const message: ChatMessage = JSON.parse(event.data);
         setLastMessage(message);
-        onMessage?.(message);
+        onMessageRef.current?.(message);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
       }
@@ -45,7 +51,7 @@ export function useWebSocket(onMessage?: (message: ChatMessage) => void): UseWeb
     return () => {
       ws.current?.close();
     };
-  }, [onMessage]);
+  }, []); // Remove onMessage dependency
 
   const sendMessage = useCallback((message: ChatMessage) => {
     if (ws.current?.readyState === WebSocket.OPEN) {

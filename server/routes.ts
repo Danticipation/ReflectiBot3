@@ -271,5 +271,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // HTTP chat endpoint for messaging
+  app.post('/api/chat', async (req, res) => {
+    try {
+      const { botId, content } = req.body;
+      
+      if (!botId || !content) {
+        return res.status(400).json({ error: 'Missing botId or content' });
+      }
+
+      // Store user message
+      await storage.createMessage({
+        botId,
+        content,
+        isUser: true
+      });
+      
+      // Get bot and learned words
+      const bot = await storage.getBot(botId);
+      const learnedWords = await storage.getLearnedWords(botId);
+      
+      if (!bot) {
+        return res.status(404).json({ error: 'Bot not found' });
+      }
+      
+      // Extract and learn new words
+      const keywords = extractKeywords(content);
+      const newWords: string[] = [];
+      
+      for (const word of keywords) {
+        const learned = await storage.createOrUpdateWord({
+          botId,
+          word,
+          context: content,
+          frequency: 1
+        });
+        
+        if (learned.frequency === 1) {
+          newWords.push(word);
+        }
+      }
+      
+      // Update bot stats
+      const updatedWordsCount = bot.wordsLearned + newWords.length;
+      let newLevel = bot.level;
+      let levelUp = false;
+      
+      // Level up logic
+      if (updatedWordsCount >= 50 && bot.level === 1) {
+        newLevel = 2;
+        levelUp = true;
+      } else if (updatedWordsCount >= 100 && bot.level === 2) {
+        newLevel = 3;
+        levelUp = true;
+      } else if (updatedWordsCount >= 200 && bot.level === 3) {
+        newLevel = 4;
+        levelUp = true;
+      }
+      
+      // Update personality traits based on user input
+      const personalityTraits = { ...bot.personalityTraits } as Record<string, number>;
+      const enthusiasmWords = ['love', 'amazing', 'awesome', 'great', 'fantastic'];
+      const humorWords = ['funny', 'hilarious', 'joke', 'laugh', 'lol'];
+      const curiosityWords = ['why', 'how', 'what', 'wonder', 'think'];
+      
+      if (keywords.some(word => enthusiasmWords.includes(word)) || content.includes('!')) {
+        personalityTraits.enthusiasm = Math.min(5, (personalityTraits.enthusiasm || 1) + 0.1);
+      }
+      if (keywords.some(word => humorWords.includes(word))) {
+        personalityTraits.humor = Math.min(5, (personalityTraits.humor || 1) + 0.1);
+      }
+      if (keywords.some(word => curiosityWords.includes(word)) || content.includes('?')) {
+        personalityTraits.curiosity = Math.min(5, (personalityTraits.curiosity || 1) + 0.1);
+      }
+      
+      await storage.updateBot(botId, {
+        wordsLearned: updatedWordsCount,
+        level: newLevel,
+        personalityTraits
+      });
+      
+      // Check for milestones
+      let milestoneAchieved = false;
+      if (levelUp) {
+        await storage.createMilestone({
+          botId,
+          title: `Reached Level ${newLevel}!`,
+          description: `Advanced to intelligence level ${newLevel}`
+        });
+        milestoneAchieved = true;
+      }
+      
+      if (updatedWordsCount === 100) {
+        await storage.createMilestone({
+          botId,
+          title: "First 100 Words!",
+          description: "Learned my first 100 words from you"
+        });
+        milestoneAchieved = true;
+      }
+      
+      if (newWords.includes('sarcasm') || newWords.includes('sarcastic')) {
+        await storage.createMilestone({
+          botId,
+          title: "Learned Sarcasm",
+          description: "Now I understand sarcasm!"
+        });
+        milestoneAchieved = true;
+      }
+      
+      // Generate bot response
+      const botResponse = generateBotResponse(content, bot, learnedWords);
+      
+      // Store bot response
+      await storage.createMessage({
+        botId,
+        content: botResponse,
+        isUser: false
+      });
+      
+      // Prepare response
+      const result = {
+        response: botResponse,
+        learningUpdate: newWords.length > 0 || levelUp ? {
+          newWords,
+          levelUp,
+          personalityUpdate: personalityTraits
+        } : null,
+        milestoneAchieved
+      };
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Chat error:', error);
+      res.status(500).json({ error: 'Failed to process chat message' });
+    }
+  });
+
   return httpServer;
 }
