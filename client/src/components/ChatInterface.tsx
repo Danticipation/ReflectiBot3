@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import type { Bot, Message, LearningUpdate } from '@shared/schema';
 
+const journalingPrompts = [
+  "What made you smile recently?",
+  "Is there anything weighing on your mind?",
+  "What's one thing you're proud of this week?",
+  "What's something you wish others understood about you?",
+  "What are you avoiding right now that you probably shouldn't be?"
+];
+
 interface ChatInterfaceProps {
   bot: Bot;
   messages: Message[];
@@ -23,13 +31,40 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [localMessages, setLocalMessages] = useState(messages);
   const [input, setInput] = useState('');
+  const [showGrowth, setShowGrowth] = useState(false);
   const [growthStats, setGrowthStats] = useState({
     wordsLearned: 0,
     factsRemembered: 0,
     stage: 'Infant 🍼',
   });
+  const [isListening, setIsListening] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error', event);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => setIsListening(false);
+    }
+  }, []);
 
   const mutation = useMutation({
     mutationFn: async (text: string) => {
@@ -72,7 +107,23 @@ export function ChatInterface({
   };
 
   const handleVoiceInput = () => {
-    alert("🎤 Voice input feature coming soon — powered by Whisper or browser speech API!");
+    if (recognitionRef.current) {
+      setIsListening(true);
+      recognitionRef.current.start();
+    } else {
+      alert('Voice recognition is not supported in this browser.');
+    }
+  };
+
+  const sendPrompt = () => {
+    const prompt = journalingPrompts[Math.floor(Math.random() * journalingPrompts.length)];
+    setLocalMessages(prev => [...prev, { text: prompt, sender: 'bot' }]);
+    setShowPrompt(false);
+  };
+
+  const toggleGrowthPanel = () => {
+    setShowGrowth(!showGrowth);
+    onToggleSidebar();
   };
 
   useEffect(() => {
@@ -125,19 +176,45 @@ export function ChatInterface({
             Send
           </Button>
           <Button 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white" 
+            className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isListening ? 'animate-pulse' : ''}`}
             onClick={handleVoiceInput}
           >
             🎤
           </Button>
           <Button 
             className="bg-yellow-600 hover:bg-yellow-700 text-white" 
-            onClick={onToggleSidebar}
+            onClick={toggleGrowthPanel}
           >
             📊
           </Button>
+          <Button 
+            className="bg-pink-600 hover:bg-pink-700 text-white" 
+            onClick={() => setShowPrompt(true)}
+          >
+            🧠
+          </Button>
         </div>
       </div>
+
+      {showGrowth && (
+        <div className="w-full max-w-3xl mt-6 p-4 bg-gray-800 rounded-xl shadow-lg text-left">
+          <h2 className="text-lg font-bold text-emerald-400 mb-2">Reflectibot Growth Dashboard</h2>
+          <ul className="list-disc pl-6 space-y-1 text-sm text-gray-300">
+            <li><strong>Words Learned:</strong> {growthStats.wordsLearned}</li>
+            <li><strong>Facts Remembered:</strong> {growthStats.factsRemembered}</li>
+            <li><strong>Current Stage:</strong> {growthStats.stage}</li>
+            <li><strong>Next Milestone:</strong> {(growthStats.wordsLearned < 200) ? '200 words for Adolescent unlock 🚀' : 'You\'re already an advanced being 🧠'}</li>
+          </ul>
+        </div>
+      )}
+
+      {showPrompt && (
+        <div className="w-full max-w-3xl mt-4 p-4 bg-gray-900 border border-gray-700 rounded-xl shadow">
+          <h3 className="text-lg text-white mb-2">Reflect with me...</h3>
+          <p className="text-sm text-gray-300 mb-4">Ready for a journaling question?</p>
+          <Button className="bg-purple-600 hover:bg-purple-700" onClick={sendPrompt}>Give me a prompt</Button>
+        </div>
+      )}
     </>
   );
 }
