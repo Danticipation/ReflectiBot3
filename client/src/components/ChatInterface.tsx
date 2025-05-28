@@ -126,94 +126,69 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Chat Header */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleSidebar}
-              className="lg:hidden"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-semibold text-gray-800">Chat with {bot.name}</h1>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span>{isConnected ? 'Active Learning Mode' : 'Disconnected'}</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <Settings className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
+    <>
+      <div className="flex-grow p-4 overflow-y-auto bg-gray-950/80 backdrop-blur">
+        {messages.map((msg, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={`mb-3 ${msg.isUser ? 'text-right' : 'text-left'}`}
+          >
+            <span className={`inline-block px-4 py-2 rounded-xl max-w-xs ${
+              msg.isUser ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'
+            }`}>
+              {msg.content}
+            </span>
+          </motion.div>
+        ))}
+        {messages.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center text-gray-400 mt-8"
+          >
+            <p>Hello! I'm {bot.name}, your evolving AI reflection. Start chatting to teach me about yourself! 🌱</p>
+          </motion.div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 max-w-4xl mx-auto">
-          {messages.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-start space-x-3"
-            >
-              <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white text-sm">
-                🤖
-              </div>
-              <div className="max-w-md">
-                <Card className="bg-white shadow-sm border border-gray-100">
-                  <CardContent className="p-4">
-                    <p className="text-gray-800">
-                      Hello! I'm {bot.name}, your personal AI companion. I start with zero knowledge, 
-                      but I learn everything from you. Teach me about yourself, and watch me grow! 🌱
-                    </p>
-                  </CardContent>
-                </Card>
-                <p className="text-xs text-gray-500 mt-1 ml-3">Just now</p>
-              </div>
-            </motion.div>
-          )}
-
-          <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : ''}`}
-              >
-                {message.isUser ? (
-                  <>
-                    <div className="max-w-md">
-                      <Card className="bg-primary text-white shadow-sm">
-                        <CardContent className="p-4">
-                          <p>{message.content}</p>
-                        </CardContent>
-                      </Card>
-                      <p className="text-xs text-gray-500 mt-1 mr-3 text-right">
-                        {new Date(message.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 text-sm">
-                      👤
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white text-sm">
-                      🤖
+      <div className="p-4 border-t border-gray-700 bg-gray-900">
+        <div className="flex gap-2">
+          <Input
+            className="flex-grow bg-gray-800 border border-gray-600 text-white placeholder-gray-400"
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit(e)}
+            placeholder="Type something reflective..."
+            disabled={isTyping || !isConnected}
+          />
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white" 
+            onClick={handleSubmit}
+            disabled={!inputValue.trim() || isTyping || !isConnected}
+          >
+            Send
+          </Button>
+          <Button 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white" 
+            onClick={handleVoiceInput}
+          >
+            🎤
+          </Button>
+          <Button 
+            className="bg-yellow-600 hover:bg-yellow-700 text-white" 
+            onClick={onToggleSidebar}
+          >
+            📊
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
                     </div>
                     <div className="max-w-md">
                       <Card className="bg-white shadow-sm border border-gray-100">
