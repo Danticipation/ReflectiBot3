@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { db } from "./db";
+import { userMemories } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { insertBotSchema, insertMessageSchema, type ChatMessage, type LearningUpdate } from "@shared/schema";
 import { z } from "zod";
 
@@ -16,6 +19,14 @@ function extractKeywords(text: string): string[] {
     .filter(word => word.length > 2 && !stopWords.has(word))
     .slice(0, 10); // Limit to 10 keywords per message
 }
+
+const getMilestoneStage = (wordCount: number): string => {
+  if (wordCount < 50) return "Infant 🍼";
+  if (wordCount < 200) return "Toddler 🚼";
+  if (wordCount < 500) return "Child 🧒";
+  if (wordCount < 1000) return "Adolescent 🧑";
+  return "Adult 🧠";
+};
 
 function generateBotResponse(userMessage: string, bot: any, learnedWords: any[]): string {
   const keywords = extractKeywords(userMessage);
@@ -406,6 +417,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: 'Failed to get milestones' });
     }
+  });
+
+  // Add the new message route
+  app.post("/api/message", async (req, res) => {
+    const { userId, text } = req.body;
+    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+
+    const uniqueWords = [...new Set(words)];
+    const storedWords = await db.select().from(userMemories).where(eq(userMemories.userId, userId));
+
+    const newWords = uniqueWords.filter(w => !storedWords.find(sw => sw.word === w));
+    if (newWords.length > 0) {
+      await db.insert(userMemories).values(newWords.map(word => ({ userId, word })));
+    }
+
+    const totalWordCount = storedWords.length + newWords.length;
+    const stage = getMilestoneStage(totalWordCount);
+
+    return res.json({ newWords, totalWordCount, stage });
   });
 
   return httpServer;
