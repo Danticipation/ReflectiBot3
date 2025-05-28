@@ -4,6 +4,8 @@ import {
   type Message, type InsertMessage, type LearnedWord, type InsertLearnedWord,
   type Milestone, type InsertMilestone 
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -30,148 +32,121 @@ export interface IStorage {
   createMilestone(milestone: InsertMilestone): Promise<Milestone>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private bots: Map<number, Bot>;
-  private messages: Map<number, Message[]>;
-  private learnedWords: Map<number, LearnedWord[]>;
-  private milestones: Map<number, Milestone[]>;
-  private currentUserId: number;
-  private currentBotId: number;
-  private currentMessageId: number;
-  private currentWordId: number;
-  private currentMilestoneId: number;
-
-  constructor() {
-    this.users = new Map();
-    this.bots = new Map();
-    this.messages = new Map();
-    this.learnedWords = new Map();
-    this.milestones = new Map();
-    this.currentUserId = 1;
-    this.currentBotId = 1;
-    this.currentMessageId = 1;
-    this.currentWordId = 1;
-    this.currentMilestoneId = 1;
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async getBot(id: number): Promise<Bot | undefined> {
-    return this.bots.get(id);
+    const [bot] = await db.select().from(bots).where(eq(bots.id, id));
+    return bot || undefined;
   }
 
   async getBotByUserId(userId: number): Promise<Bot | undefined> {
-    return Array.from(this.bots.values()).find(bot => bot.userId === userId);
+    const [bot] = await db.select().from(bots).where(eq(bots.userId, userId));
+    return bot || undefined;
   }
 
   async createBot(insertBot: InsertBot): Promise<Bot> {
-    const id = this.currentBotId++;
-    const bot: Bot = { 
-      ...insertBot, 
-      id, 
-      createdAt: new Date(),
-      personalityTraits: insertBot.personalityTraits || {
-        enthusiasm: 1,
-        humor: 1,
-        curiosity: 2
-      }
-    };
-    this.bots.set(id, bot);
-    this.messages.set(id, []);
-    this.learnedWords.set(id, []);
-    this.milestones.set(id, []);
+    const [bot] = await db
+      .insert(bots)
+      .values({
+        ...insertBot,
+        name: insertBot.name || "Mirror",
+        level: insertBot.level || 1,
+        wordsLearned: insertBot.wordsLearned || 0,
+        personalityTraits: insertBot.personalityTraits || {
+          enthusiasm: 1,
+          humor: 1,
+          curiosity: 2
+        }
+      })
+      .returning();
     return bot;
   }
 
   async updateBot(id: number, updates: Partial<Bot>): Promise<Bot | undefined> {
-    const bot = this.bots.get(id);
-    if (!bot) return undefined;
-
-    const updatedBot = { ...bot, ...updates };
-    this.bots.set(id, updatedBot);
-    return updatedBot;
+    const [bot] = await db
+      .update(bots)
+      .set(updates)
+      .where(eq(bots.id, id))
+      .returning();
+    return bot || undefined;
   }
 
   async getMessages(botId: number): Promise<Message[]> {
-    return this.messages.get(botId) || [];
+    return await db.select().from(messages).where(eq(messages.botId, botId));
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = this.currentMessageId++;
-    const message: Message = { 
-      ...insertMessage, 
-      id, 
-      timestamp: new Date() 
-    };
-    
-    const botMessages = this.messages.get(insertMessage.botId) || [];
-    botMessages.push(message);
-    this.messages.set(insertMessage.botId, botMessages);
-    
+    const [message] = await db
+      .insert(messages)
+      .values(insertMessage)
+      .returning();
     return message;
   }
 
   async getLearnedWords(botId: number): Promise<LearnedWord[]> {
-    return this.learnedWords.get(botId) || [];
+    return await db.select().from(learnedWords).where(eq(learnedWords.botId, botId));
   }
 
   async createOrUpdateWord(insertWord: InsertLearnedWord): Promise<LearnedWord> {
-    const words = this.learnedWords.get(insertWord.botId) || [];
-    const existingWord = words.find(w => w.word.toLowerCase() === insertWord.word.toLowerCase());
+    const [existingWord] = await db
+      .select()
+      .from(learnedWords)
+      .where(eq(learnedWords.word, insertWord.word.toLowerCase()))
+      .where(eq(learnedWords.botId, insertWord.botId));
     
     if (existingWord) {
-      existingWord.frequency += 1;
-      if (insertWord.context) {
-        existingWord.context = insertWord.context;
-      }
-      return existingWord;
+      const [updatedWord] = await db
+        .update(learnedWords)
+        .set({ 
+          frequency: existingWord.frequency + 1,
+          context: insertWord.context || existingWord.context
+        })
+        .where(eq(learnedWords.id, existingWord.id))
+        .returning();
+      return updatedWord;
     } else {
-      const id = this.currentWordId++;
-      const word: LearnedWord = { 
-        ...insertWord, 
-        id, 
-        firstLearnedAt: new Date() 
-      };
-      words.push(word);
-      this.learnedWords.set(insertWord.botId, words);
+      const [word] = await db
+        .insert(learnedWords)
+        .values({
+          ...insertWord,
+          frequency: insertWord.frequency || 1
+        })
+        .returning();
       return word;
     }
   }
 
   async getMilestones(botId: number): Promise<Milestone[]> {
-    return this.milestones.get(botId) || [];
+    return await db.select().from(milestones).where(eq(milestones.botId, botId));
   }
 
   async createMilestone(insertMilestone: InsertMilestone): Promise<Milestone> {
-    const id = this.currentMilestoneId++;
-    const milestone: Milestone = { 
-      ...insertMilestone, 
-      id, 
-      achievedAt: new Date() 
-    };
-    
-    const botMilestones = this.milestones.get(insertMilestone.botId) || [];
-    botMilestones.push(milestone);
-    this.milestones.set(insertMilestone.botId, botMilestones);
-    
+    const [milestone] = await db
+      .insert(milestones)
+      .values({
+        ...insertMilestone,
+        description: insertMilestone.description || null
+      })
+      .returning();
     return milestone;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
