@@ -45,6 +45,7 @@ export function ChatInterface({
       
       if (response.ok) {
         const result = await response.json();
+        console.log('Chat response:', result);
         
         // Add bot response
         const botMessage: Message = {
@@ -67,6 +68,8 @@ export function ChatInterface({
         if (result.milestoneAchieved) {
           onMilestoneAchieved();
         }
+      } else {
+        console.error('Chat request failed:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to send message:', error);

@@ -217,61 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // REST API routes
-  app.post('/api/bot', async (req, res) => {
-    try {
-      const botData = insertBotSchema.parse(req.body);
-      const bot = await storage.createBot(botData);
-      res.json(bot);
-    } catch (error) {
-      res.status(400).json({ error: 'Invalid bot data' });
-    }
-  });
-
-  app.get('/api/bot/:id', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const bot = await storage.getBot(id);
-      if (!bot) {
-        return res.status(404).json({ error: 'Bot not found' });
-      }
-      res.json(bot);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get bot' });
-    }
-  });
-
-  app.get('/api/bot/:id/messages', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const messages = await storage.getMessages(id);
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get messages' });
-    }
-  });
-
-  app.get('/api/bot/:id/words', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const words = await storage.getLearnedWords(id);
-      res.json(words);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get learned words' });
-    }
-  });
-
-  app.get('/api/bot/:id/milestones', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const milestones = await storage.getMilestones(id);
-      res.json(milestones);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get milestones' });
-    }
-  });
-
-  // HTTP chat endpoint for messaging
+  // HTTP chat endpoint for messaging - must be before other routes
   app.post('/api/chat', async (req, res) => {
     try {
       const { botId, content } = req.body;
@@ -405,6 +351,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Chat error:', error);
       res.status(500).json({ error: 'Failed to process chat message' });
+    }
+  });
+
+  // REST API routes
+  app.post('/api/bot', async (req, res) => {
+    try {
+      const botData = insertBotSchema.parse(req.body);
+      const bot = await storage.createBot(botData);
+      res.json(bot);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid bot data' });
+    }
+  });
+
+  app.get('/api/bot/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const bot = await storage.getBot(id);
+      if (!bot) {
+        return res.status(404).json({ error: 'Bot not found' });
+      }
+      res.json(bot);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get bot' });
+    }
+  });
+
+  app.get('/api/bot/:id/messages', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const messages = await storage.getMessages(id);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get messages' });
+    }
+  });
+
+  app.get('/api/bot/:id/words', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const words = await storage.getLearnedWords(id);
+      res.json(words);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get learned words' });
+    }
+  });
+
+  app.get('/api/bot/:id/milestones', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const milestones = await storage.getMilestones(id);
+      res.json(milestones);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get milestones' });
     }
   });
 
