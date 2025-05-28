@@ -443,30 +443,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.query;
       
-      // Get recent user memories from the past week
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+      }
       
+      // Get user memories
       const recentMemories = await db.select().from(userMemories)
         .where(eq(userMemories.userId, parseInt(userId as string)));
       
       const totalWords = recentMemories.length;
       const stage = getMilestoneStage(totalWords);
       
-      // Generate a simple summary based on learned words
-      let summary = `This week you've been exploring new vocabulary and expressing yourself! 
+      // Generate summary based on actual data
+      let summary = "";
       
+      if (totalWords === 0) {
+        summary = "Start chatting with your Mirror Bot to build your weekly reflection summary! Share your thoughts, feelings, and experiences.";
+      } else {
+        summary = `This week you've been exploring new vocabulary and expressing yourself! 
+
 🌱 Growth Summary:
 - Words learned: ${totalWords}
 - Current stage: ${stage}
 - Active engagement with self-reflection
 
 Your Mirror Bot has been learning from your unique way of expressing thoughts and feelings. Keep sharing your inner world to help it understand you better!`;
-
-      if (totalWords === 0) {
-        summary = "Start chatting with your Mirror Bot to build your weekly reflection summary! Share your thoughts, feelings, and experiences.";
       }
 
+      res.setHeader('Content-Type', 'application/json');
       return res.json({ summary });
     } catch (error) {
       console.error('Failed to generate weekly summary:', error);
