@@ -1,0 +1,114 @@
+// Reflectibot / MirrorBot UI - React + Tailwind + Framer Motion + TanStack Query
+// Includes live memory tracking from backend and progress visualization
+
+import { useState, useRef, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
+import axios from 'axios';
+
+export default function MirrorBotUI() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [showGrowth, setShowGrowth] = useState(false);
+  const [growthStats, setGrowthStats] = useState({
+    wordsLearned: 0,
+    factsRemembered: 0,
+    stage: 'Infant 🍼',
+  });
+  const messagesEndRef = useRef(null);
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (text) => {
+      const res = await axios.post('/api/message', {
+        userId: 1, // replace with dynamic user id
+        text,
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setGrowthStats({
+        wordsLearned: data.totalWordCount,
+        factsRemembered: data.factsCount || 0,
+        stage: data.stage,
+      });
+
+      const response = {
+        text: `Reflectibot: I heard you say "${data.echoedText || input}"`,
+        sender: 'bot'
+      };
+      setMessages(prev => [...prev, { text: input, sender: 'user' }, response]);
+      setInput('');
+    }
+  });
+
+  const sendMessage = () => {
+    if (!input.trim()) return;
+    mutation.mutate(input);
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleVoiceInput = () => {
+    alert("🎤 Voice input feature coming soon — powered by Whisper or browser speech API!");
+  };
+
+  const toggleGrowthPanel = () => {
+    setShowGrowth(!showGrowth);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col items-center justify-center px-4 py-8">
+      <div className="w-full max-w-3xl h-[80vh] flex flex-col border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
+        <div className="flex-grow p-4 overflow-y-auto bg-gray-950/80 backdrop-blur">
+          {messages.map((msg, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className={`mb-3 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
+            >
+              <span className={`inline-block px-4 py-2 rounded-xl max-w-xs ${msg.sender === 'user' ? 'bg-blue-600' : 'bg-gray-800'}`}>
+                {msg.text}
+              </span>
+            </motion.div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-4 border-t border-gray-700 bg-gray-900">
+          <div className="flex gap-2">
+            <Input
+              className="flex-grow bg-gray-800 border border-gray-600 text-white"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              placeholder="Type something reflective..."
+            />
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={sendMessage}>Send</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleVoiceInput}>🎤</Button>
+            <Button className="bg-yellow-600 hover:bg-yellow-700" onClick={toggleGrowthPanel}>📊</Button>
+          </div>
+        </div>
+      </div>
+
+      {showGrowth && (
+        <div className="w-full max-w-3xl mt-6 p-4 bg-gray-800 rounded-xl shadow-lg text-left">
+          <h2 className="text-lg font-bold text-emerald-400 mb-2">Reflectibot Growth Dashboard</h2>
+          <ul className="list-disc pl-6 space-y-1 text-sm text-gray-300">
+            <li><strong>Words Learned:</strong> {growthStats.wordsLearned}</li>
+            <li><strong>Facts Remembered:</strong> {growthStats.factsRemembered}</li>
+            <li><strong>Current Stage:</strong> {growthStats.stage}</li>
+            <li><strong>Next Milestone:</strong> {(growthStats.wordsLearned < 200) ? '200 words for Adolescent unlock 🚀' : 'You’re already an advanced being 🧠'}</li>
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-6 text-sm text-gray-400">Reflectibot™ v1.0 — Your evolving AI twin.</div>
+    </div>
+  );
+}

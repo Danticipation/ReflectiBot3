@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Send, Mic, Menu } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import type { Bot, Message, LearningUpdate } from '@shared/schema';
 
@@ -23,41 +21,54 @@ export function ChatInterface({
   onLearningUpdate, 
   onMilestoneAchieved 
 }: ChatInterfaceProps) {
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [isConnected] = useState(true);
+  const [localMessages, setLocalMessages] = useState(messages);
+  const [input, setInput] = useState('');
+  const [growthStats, setGrowthStats] = useState({
+    wordsLearned: 0,
+    factsRemembered: 0,
+    stage: 'Infant 🍼',
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const response = await apiRequest(`/api/bot/${bot.id}/message`, {
+  const mutation = useMutation({
+    mutationFn: async (text: string) => {
+      const response = await apiRequest('/api/message', {
         method: 'POST',
-        body: JSON.stringify({ content, isUser: true })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 1, // replace with dynamic user id
+          text,
+        })
       });
       return response;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/bot/${bot.id}/messages`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/bot/${bot.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/bot/${bot.id}/words`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/bot/${bot.id}/milestones`] });
+    onSuccess: (data) => {
+      setGrowthStats({
+        wordsLearned: data.totalWordCount,
+        factsRemembered: data.factsCount || 0,
+        stage: data.stage,
+      });
+
+      const response = {
+        text: `Reflectibot: I heard you say "${data.echoedText || input}"`,
+        sender: 'bot'
+      };
+      setLocalMessages(prev => [...prev, { text: input, sender: 'user' }, response]);
+      setInput('');
+      
+      // Trigger learning update callback
+      onLearningUpdate({
+        newWords: data.newWords || [],
+        levelUp: false,
+        personalityUpdate: {}
+      });
     }
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isTyping) return;
-
-    setIsTyping(true);
-    try {
-      await sendMessageMutation.mutateAsync(inputValue);
-      setInputValue('');
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
-      setIsTyping(false);
-    }
+  const sendMessage = () => {
+    if (!input.trim()) return;
+    mutation.mutate(input);
   };
 
   const handleVoiceInput = () => {
@@ -66,27 +77,27 @@ export function ChatInterface({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [localMessages]);
 
   return (
     <>
       <div className="flex-grow p-4 overflow-y-auto bg-gray-950/80 backdrop-blur">
-        {messages.map((msg, index) => (
+        {localMessages.map((msg, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className={`mb-3 ${msg.isUser ? 'text-right' : 'text-left'}`}
+            className={`mb-3 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
           >
             <span className={`inline-block px-4 py-2 rounded-xl max-w-xs ${
-              msg.isUser ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'
+              msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'
             }`}>
-              {msg.content}
+              {msg.text}
             </span>
           </motion.div>
         ))}
-        {messages.length === 0 && (
+        {localMessages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -102,16 +113,14 @@ export function ChatInterface({
         <div className="flex gap-2">
           <Input
             className="flex-grow bg-gray-800 border border-gray-600 text-white placeholder-gray-400"
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit(e)}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
             placeholder="Type something reflective..."
-            disabled={isTyping || !isConnected}
           />
           <Button 
             className="bg-emerald-600 hover:bg-emerald-700 text-white" 
-            onClick={handleSubmit}
-            disabled={!inputValue.trim() || isTyping || !isConnected}
+            onClick={sendMessage}
           >
             Send
           </Button>
