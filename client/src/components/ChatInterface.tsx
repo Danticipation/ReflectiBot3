@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ export function ChatInterface({
   const [localMessages, setLocalMessages] = useState(messages);
   const [input, setInput] = useState('');
   const [showGrowth, setShowGrowth] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [growthStats, setGrowthStats] = useState({
     wordsLearned: 0,
     factsRemembered: 0,
@@ -123,8 +124,20 @@ export function ChatInterface({
 
   const toggleGrowthPanel = () => {
     setShowGrowth(!showGrowth);
-    onToggleSidebar();
   };
+
+  const toggleSummaryPanel = () => {
+    setShowSummary(!showSummary);
+  };
+
+  const summaryQuery = useQuery({
+    queryKey: ['weekly-summary'],
+    queryFn: async () => {
+      const response = await apiRequest('/api/weekly-summary?userId=1');
+      return response.summary;
+    },
+    enabled: showSummary
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -193,6 +206,12 @@ export function ChatInterface({
           >
             🧠
           </Button>
+          <Button 
+            className="bg-purple-700 hover:bg-purple-800 text-white" 
+            onClick={toggleSummaryPanel}
+          >
+            📅
+          </Button>
         </div>
       </div>
 
@@ -213,6 +232,15 @@ export function ChatInterface({
           <h3 className="text-lg text-white mb-2">Reflect with me...</h3>
           <p className="text-sm text-gray-300 mb-4">Ready for a journaling question?</p>
           <Button className="bg-purple-600 hover:bg-purple-700" onClick={sendPrompt}>Give me a prompt</Button>
+        </div>
+      )}
+
+      {showSummary && (
+        <div className="w-full max-w-3xl mt-4 p-4 bg-gray-900 border border-gray-700 rounded-xl shadow text-left">
+          <h3 className="text-lg text-emerald-400 mb-2">🧾 Your Weekly Reflection</h3>
+          <p className="text-sm text-gray-300 whitespace-pre-line">
+            {summaryQuery.isLoading ? 'Generating your weekly summary...' : summaryQuery.data || 'No summary available yet.'}
+          </p>
         </div>
       )}
     </>
