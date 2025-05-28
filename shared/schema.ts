@@ -8,6 +8,21 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+export const userMemories = pgTable("user_memories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  word: text("word").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userFacts = pgTable("user_facts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const bots = pgTable("bots", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -68,6 +83,16 @@ export const insertMilestoneSchema = createInsertSchema(milestones).omit({
   achievedAt: true,
 });
 
+export const insertUserMemorySchema = createInsertSchema(userMemories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserFactSchema = createInsertSchema(userFacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Bot = typeof bots.$inferSelect;
@@ -78,6 +103,10 @@ export type LearnedWord = typeof learnedWords.$inferSelect;
 export type InsertLearnedWord = z.infer<typeof insertLearnedWordSchema>;
 export type Milestone = typeof milestones.$inferSelect;
 export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type UserMemory = typeof userMemories.$inferSelect;
+export type InsertUserMemory = z.infer<typeof insertUserMemorySchema>;
+export type UserFact = typeof userFacts.$inferSelect;
+export type InsertUserFact = z.infer<typeof insertUserFactSchema>;
 
 // WebSocket message types
 export interface ChatMessage {

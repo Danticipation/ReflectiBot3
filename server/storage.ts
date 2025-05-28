@@ -105,11 +105,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrUpdateWord(insertWord: InsertLearnedWord): Promise<LearnedWord> {
-    const [existingWord] = await db
+    const existingWords = await db
       .select()
       .from(learnedWords)
-      .where(eq(learnedWords.word, insertWord.word.toLowerCase()))
-      .where(eq(learnedWords.botId, insertWord.botId));
+      .where(eq(learnedWords.word, insertWord.word.toLowerCase()));
+    
+    const existingWord = existingWords.find(w => w.botId === insertWord.botId);
     
     if (existingWord) {
       const [updatedWord] = await db

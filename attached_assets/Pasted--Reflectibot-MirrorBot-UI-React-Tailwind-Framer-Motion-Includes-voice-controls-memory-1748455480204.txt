@@ -1,0 +1,93 @@
+// Reflectibot / MirrorBot UI - React + Tailwind + Framer Motion
+// Includes voice controls, memory dashboard button, and growth visualization panel
+
+import { useState, useRef, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+
+export default function MirrorBotUI() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [showGrowth, setShowGrowth] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const sendMessage = () => {
+    if (!input.trim()) return;
+    const newMessage = { text: input, sender: 'user' };
+    setMessages([...messages, newMessage]);
+    setInput('');
+    // Simulate AI response
+    setTimeout(() => {
+      const response = {
+        text: `Reflectibot: I heard you say "${newMessage.text}"`,
+        sender: 'bot'
+      };
+      setMessages(prev => [...prev, response]);
+    }, 500);
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleVoiceInput = () => {
+    alert("🎤 Voice input feature coming soon — powered by Whisper or browser speech API!");
+  };
+
+  const toggleGrowthPanel = () => {
+    setShowGrowth(!showGrowth);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col items-center justify-center px-4 py-8">
+      <div className="w-full max-w-3xl h-[80vh] flex flex-col border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
+        <div className="flex-grow p-4 overflow-y-auto bg-gray-950/80 backdrop-blur">
+          {messages.map((msg, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className={`mb-3 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
+            >
+              <span className={`inline-block px-4 py-2 rounded-xl max-w-xs ${msg.sender === 'user' ? 'bg-blue-600' : 'bg-gray-800'}`}>
+                {msg.text}
+              </span>
+            </motion.div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-4 border-t border-gray-700 bg-gray-900">
+          <div className="flex gap-2">
+            <Input
+              className="flex-grow bg-gray-800 border border-gray-600 text-white"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              placeholder="Type something reflective..."
+            />
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={sendMessage}>Send</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleVoiceInput}>🎤</Button>
+            <Button className="bg-yellow-600 hover:bg-yellow-700" onClick={toggleGrowthPanel}>📊</Button>
+          </div>
+        </div>
+      </div>
+
+      {showGrowth && (
+        <div className="w-full max-w-3xl mt-6 p-4 bg-gray-800 rounded-xl shadow-lg text-left">
+          <h2 className="text-lg font-bold text-emerald-400 mb-2">Reflectibot Growth Dashboard</h2>
+          <ul className="list-disc pl-6 space-y-1 text-sm text-gray-300">
+            <li><strong>Words Learned:</strong> 124</li>
+            <li><strong>Facts Remembered:</strong> 19 personal entries</li>
+            <li><strong>Current Stage:</strong> Toddler 🍼</li>
+            <li><strong>Next Milestone:</strong> 200 words for Adolescent unlock 🚀</li>
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-6 text-sm text-gray-400">Reflectibot™ v1.0 — Your evolving AI twin.</div>
+    </div>
+  );
+}

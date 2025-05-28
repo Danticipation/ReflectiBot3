@@ -120,62 +120,81 @@ export function ChatInterface({
     setInputValue(suggestion);
   };
 
+  const handleVoiceInput = () => {
+    // TODO: Implement voice input with Whisper or browser speech API
+    alert("🎤 Voice input feature coming soon — powered by Whisper or browser speech API!");
+  };
+
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Chat Header */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleSidebar}
-              className="lg:hidden"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-semibold text-gray-800">Chat with {bot.name}</h1>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span>{isConnected ? 'Active Learning Mode' : 'Disconnected'}</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-gray-900/80 backdrop-blur border-b border-gray-700 p-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleSidebar}
+                className="lg:hidden text-white hover:bg-gray-700"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                  🤖
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-white">{bot.name}</h1>
+                  <div className="flex items-center space-x-2 text-sm text-gray-400">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                    <span>{isConnected ? 'Learning & Growing...' : 'Disconnected'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-gray-700">
+                <Settings className="w-5 h-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onToggleSidebar}
+                className="text-yellow-400 hover:text-yellow-300 hover:bg-gray-700"
+              >
+                📊
+              </Button>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <Settings className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-          </div>
         </div>
-      </div>
 
-      {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 max-w-4xl mx-auto">
-          {messages.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-start space-x-3"
-            >
-              <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white text-sm">
-                🤖
-              </div>
-              <div className="max-w-md">
-                <Card className="bg-white shadow-sm border border-gray-100">
-                  <CardContent className="p-4">
-                    <p className="text-gray-800">
-                      Hello! I'm {bot.name}, your personal AI companion. I start with zero knowledge, 
-                      but I learn everything from you. Teach me about yourself, and watch me grow! 🌱
-                    </p>
-                  </CardContent>
-                </Card>
-                <p className="text-xs text-gray-500 mt-1 ml-3">Just now</p>
-              </div>
-            </motion.div>
-          )}
+        {/* Chat Messages */}
+        <ScrollArea className="flex-1 p-4 bg-gray-950/80 backdrop-blur">
+          <div className="space-y-4 max-w-4xl mx-auto">
+            {messages.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start space-x-3"
+              >
+                <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm">
+                  🤖
+                </div>
+                <div className="max-w-md">
+                  <Card className="bg-gray-800/90 border-gray-700 shadow-lg">
+                    <CardContent className="p-4">
+                      <p className="text-gray-200">
+                        Hello! I'm {bot.name}, your evolving AI reflection. I start with zero knowledge, 
+                        but I learn everything from you. Teach me about yourself, and watch me grow into your digital twin! 🌱
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <p className="text-xs text-gray-500 mt-1 ml-3">Just now</p>
+                </div>
+              </motion.div>
+            )}
 
           <AnimatePresence>
             {messages.map((message) => (
@@ -207,13 +226,13 @@ export function ChatInterface({
                   </>
                 ) : (
                   <>
-                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white text-sm">
+                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm">
                       🤖
                     </div>
                     <div className="max-w-md">
-                      <Card className="bg-white shadow-sm border border-gray-100">
+                      <Card className="bg-gray-800/90 border-gray-700 shadow-lg">
                         <CardContent className="p-4">
-                          <p className="text-gray-800">{message.content}</p>
+                          <p className="text-gray-200">{message.content}</p>
                           {/* Show learning indicator for recent messages */}
                           {newWords.length > 0 && messages.indexOf(message) === messages.length - 1 && (
                             <motion.div
@@ -222,7 +241,7 @@ export function ChatInterface({
                               exit={{ opacity: 0, scale: 0.8 }}
                               className="mt-2 flex items-center space-x-2 text-xs"
                             >
-                              <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center space-x-1">
+                              <div className="bg-emerald-900/50 text-emerald-300 px-2 py-1 rounded-full flex items-center space-x-1 border border-emerald-700">
                                 <Plus className="w-3 h-3" />
                                 <span>Learned: {newWords.join(', ')}</span>
                               </div>
@@ -281,57 +300,59 @@ export function ChatInterface({
         </div>
       </ScrollArea>
 
-      {/* Chat Input */}
-      <div className="bg-white border-t border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Suggestion Chips */}
-          <div className="mb-3 flex flex-wrap gap-2">
-            {suggestionChips.map((suggestion, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="text-xs"
-              >
-                {suggestion}
-              </Button>
-            ))}
-          </div>
-
-          {/* Input Form */}
-          <form onSubmit={handleSubmit} className="flex items-center space-x-3">
-            <div className="flex-1 relative">
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Teach me something about yourself..."
-                className="pr-12 rounded-2xl"
-                disabled={isTyping || !isConnected}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              >
-                <Mic className="w-4 h-4" />
-              </Button>
+        {/* Chat Input */}
+        <div className="bg-gray-900 border-t border-gray-700 p-4">
+          <div className="max-w-4xl mx-auto">
+            {/* Suggestion Chips */}
+            <div className="mb-3 flex flex-wrap gap-2">
+              {suggestionChips.map((suggestion, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="text-xs text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
+                >
+                  {suggestion}
+                </Button>
+              ))}
             </div>
-            <Button
-              type="submit"
-              disabled={!inputValue.trim() || isTyping || !isConnected}
-              className="rounded-2xl px-6"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
 
-          {/* Teaching Tips */}
-          <div className="mt-3 text-center">
-            <p className="text-xs text-gray-500">
-              💡 Tip: The more you chat, the smarter {bot.name} becomes! Try describing your feelings, preferences, and experiences.
-            </p>
+            {/* Input Form */}
+            <form onSubmit={handleSubmit} className="flex items-center space-x-3">
+              <div className="flex-1 relative">
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Type something reflective..."
+                  className="pr-24 rounded-2xl bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                  disabled={isTyping || !isConnected}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleVoiceInput}
+                  className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white hover:bg-gray-700"
+                >
+                  🎤
+                </Button>
+              </div>
+              <Button
+                type="submit"
+                disabled={!inputValue.trim() || isTyping || !isConnected}
+                className="rounded-2xl px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                Send
+              </Button>
+            </form>
+
+            {/* Teaching Tips */}
+            <div className="mt-3 text-center">
+              <p className="text-xs text-gray-400">
+                💡 Tip: The more you chat, the smarter {bot.name} becomes! Try describing your feelings, preferences, and experiences.
+              </p>
+            </div>
           </div>
         </div>
       </div>
