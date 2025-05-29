@@ -268,65 +268,80 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="text-center p-4 border-b border-gray-700">
-        <h1 className="text-2xl font-bold text-emerald-400 mb-2">🪞 Mirror Bot</h1>
-        <p className="text-gray-400 text-sm">AI companion that learns and speaks</p>
-        <div className="flex justify-center gap-4 mt-3">
-          <div className="bg-gray-800 px-3 py-1 rounded-lg text-xs border border-gray-700">
-            <span className="text-emerald-400">Level {botStats.level}</span>
-            <span className="text-gray-400 ml-2">• {botStats.stage}</span>
-          </div>
-          <div className="bg-gray-800 px-3 py-1 rounded-lg text-xs border border-gray-700">
-            <span className="text-blue-400">{botStats.wordsLearned}</span>
-            <span className="text-gray-400 ml-1">words learned</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white">
+      <div className="max-w-6xl mx-auto flex flex-col h-screen">
+        {/* Header */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-800/50 to-gray-800/50 backdrop-blur-sm border-b border-slate-700/50">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-blue-500/10"></div>
+          <div className="relative p-6">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent mb-2">
+                Reflectibot
+              </h1>
+              <p className="text-slate-400 text-sm font-medium">Your evolving AI companion</p>
+            </div>
+            
+            <div className="flex justify-center gap-6 mt-6">
+              <div className="bg-slate-800/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-600/50 shadow-lg">
+                <div className="text-center">
+                  <div className="text-emerald-400 font-bold text-lg">Level {botStats.level}</div>
+                  <div className="text-slate-400 text-xs font-medium">{botStats.stage}</div>
+                </div>
+              </div>
+              <div className="bg-slate-800/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-600/50 shadow-lg">
+                <div className="text-center">
+                  <div className="text-blue-400 font-bold text-lg">{botStats.wordsLearned}</div>
+                  <div className="text-slate-400 text-xs font-medium">words learned</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-4">🤖</div>
-            <h3 className="text-lg text-gray-300 mb-2">Welcome to Mirror Bot!</h3>
-            <p className="text-gray-500">Start a conversation and watch me learn from you.</p>
-            <p className="text-gray-500 text-xs mt-2">I'll speak my responses and adapt to your style.</p>
-          </div>
-        ) : (
-          <>
-            {messages.map((message, index) => (
-              <div key={index} className={`mb-3 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
-                <div className={`inline-block px-4 py-2 rounded-xl max-w-xs ${
-                  message.sender === 'user' 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'bg-gray-700 text-gray-100 border border-gray-600'
-                }`}>
-                  <div className="text-sm leading-relaxed">{message.text}</div>
-                  <div className="text-xs opacity-70 mt-1">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {messages.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
+                <div className="text-4xl">🤖</div>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-200 mb-3">Welcome to Reflectibot!</h2>
+              <p className="text-slate-400 max-w-md mx-auto mb-2">Start a conversation and watch me learn from you.</p>
+              <p className="text-slate-500 text-sm">I'll speak my responses and adapt to your style over time.</p>
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto">
+              {messages.map((message, index) => (
+                <div key={index} className={`mb-6 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
+                  <div className={`inline-block px-6 py-4 rounded-2xl max-w-lg shadow-lg ${
+                    message.sender === 'user' 
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white' 
+                      : 'bg-slate-800/80 backdrop-blur-sm text-slate-100 border border-slate-700/50'
+                  }`}>
+                    <div className="text-sm leading-relaxed">{message.text}</div>
+                    <div className="text-xs opacity-60 mt-2">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className="text-left mb-3">
-                <div className="bg-gray-700 border border-gray-600 px-4 py-2 rounded-xl inline-block">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+              ))}
+              
+              {isLoading && (
+                <div className="text-left mb-6">
+                  <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 px-6 py-4 rounded-2xl inline-block shadow-lg">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
 
       {/* Input Area */}
       <div className="p-4 border-t border-gray-700">
