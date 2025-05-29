@@ -343,7 +343,7 @@ function App() {
           )}
         </div>
 
-      {/* Input Area */}
+        {/* Input Area */}
       <div className="p-4 border-t border-gray-700">
         <div className="flex gap-2">
           <input
@@ -497,6 +497,7 @@ function App() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
