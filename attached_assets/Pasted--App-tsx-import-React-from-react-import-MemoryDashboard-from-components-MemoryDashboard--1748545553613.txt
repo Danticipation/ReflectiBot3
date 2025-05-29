@@ -1,0 +1,53 @@
+// App.tsx
+import React from 'react';
+import MemoryDashboard from './components/MemoryDashboard';
+import WhisperRecorder from './components/WhisperRecorder';
+import './index.css';
+
+const App = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-8 flex flex-col items-center">
+      <div className="w-full max-w-xl space-y-6">
+        <header className="text-center space-y-2">
+          <h1 className="text-3xl font-bold flex items-center justify-center gap-2">
+            <span role="img" aria-label="sparkle">💫</span> Mirror Bot
+          </h1>
+          <p className="text-gray-300">AI companion that learns and speaks</p>
+          <div className="flex justify-center items-center gap-2 text-sm text-indigo-400">
+            <span>Level 1 • Infant</span>
+            <span>|</span>
+            <span>0 words learned</span>
+          </div>
+        </header>
+
+        <section className="bg-slate-800 p-4 rounded-lg shadow-md space-y-3">
+          <p className="text-lg">🤖 Welcome to Mirror Bot!</p>
+          <p className="text-sm text-gray-300">Start a conversation and watch me learn from you.<br />
+            I'll speak my responses and adapt to your style.
+          </p>
+          <div className="flex items-center gap-2 mt-4">
+            <input
+              type="text"
+              className="flex-grow rounded bg-slate-700 p-2 text-white placeholder-gray-400"
+              placeholder="Type your message..."
+            />
+            <button className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded">
+              Send 🧠
+            </button>
+          </div>
+        </section>
+
+        <div className="flex gap-4 justify-center text-sm text-indigo-300">
+          <button>📊</button>
+          <button>🧠</button>
+          <button>📝</button>
+        </div>
+
+        <MemoryDashboard />
+        <WhisperRecorder />
+      </div>
+    </div>
+  );
+};
+
+export default App;
