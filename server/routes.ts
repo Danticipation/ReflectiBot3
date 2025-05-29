@@ -43,9 +43,6 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Set up Vite development server for React app
-  await setupVite(app, httpServer);
-
   // Create a new bot
   app.post("/api/bot", async (req, res) => {
     try {
@@ -175,17 +172,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
 
-      const { ElevenLabs } = await import("elevenlabs");
+      const elevenlabs = await import("elevenlabs");
       
       if (!process.env.ELEVENLABS_API_KEY) {
         return res.status(500).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const elevenlabs = new ElevenLabs({
+      const client = new elevenlabs.ElevenLabsApi({
         apiKey: process.env.ELEVENLABS_API_KEY
       });
 
-      const audio = await elevenlabs.generate({
+      const audio = await client.generate({
         voice: "Rachel",
         text: text,
         model_id: "eleven_monolingual_v1"
@@ -209,6 +206,276 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Text-to-speech error:', error);
       res.status(500).json({ error: "Failed to generate speech" });
     }
+  });
+
+  // Serve a simple working Mirror Bot interface
+  app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-black text-white">
+    <div class="h-screen flex flex-col max-w-4xl mx-auto">
+        <div class="text-center p-4 border-b border-gray-700">
+            <h1 class="text-2xl font-bold text-emerald-400 mb-2">🪞 Mirror Bot</h1>
+            <p class="text-gray-400 text-sm">AI companion that learns and speaks</p>
+            <div class="flex justify-center gap-4 mt-3">
+                <div class="bg-gray-800 px-3 py-1 rounded-lg text-xs border border-gray-700">
+                    <span class="text-emerald-400">Level <span id="botLevel">1</span></span>
+                    <span class="text-gray-400 ml-2">• <span id="botStage">Infant</span></span>
+                </div>
+                <div class="bg-gray-800 px-3 py-1 rounded-lg text-xs border border-gray-700">
+                    <span class="text-blue-400"><span id="wordsLearned">0</span></span>
+                    <span class="text-gray-400 ml-1">words learned</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4" id="chatArea">
+            <div class="text-center py-20" id="welcomeMessage">
+                <div class="text-5xl mb-4">🤖</div>
+                <h3 class="text-lg text-gray-300 mb-2">Welcome to Mirror Bot!</h3>
+                <p class="text-gray-500">Start a conversation and watch me learn from you.</p>
+                <p class="text-gray-500 text-xs mt-2">I'll speak my responses and adapt to your style.</p>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-700">
+            <div class="flex gap-2">
+                <input
+                    id="messageInput"
+                    class="flex-1 bg-gray-800 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Type your message..."
+                />
+                <button id="sendBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">Send</button>
+                <button id="voiceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg">🎤</button>
+            </div>
+            <div class="mt-2 text-xs text-gray-500 flex justify-between">
+                <div id="statusArea"></div>
+                <span>Press Enter to send</span>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audioPlayer" style="display: none;"></audio>
+
+    <script>
+        let isLoading = false;
+        let isSpeaking = false;
+        let isListening = false;
+        let recognition = null;
+
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onresult = (event) => {
+                document.getElementById('messageInput').value = event.results[0][0].transcript;
+                setListening(false);
+            };
+            recognition.onend = () => setListening(false);
+        }
+
+        function setListening(listening) {
+            isListening = listening;
+            const voiceBtn = document.getElementById('voiceBtn');
+            const statusArea = document.getElementById('statusArea');
+            
+            if (listening) {
+                voiceBtn.className = 'bg-red-600 text-white px-3 py-2 rounded-lg animate-pulse';
+                statusArea.innerHTML = '<span class="text-red-400">🎤 Listening...</span>';
+            } else {
+                voiceBtn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg';
+                updateStatus();
+            }
+        }
+
+        function setSpeaking(speaking) {
+            isSpeaking = speaking;
+            updateStatus();
+        }
+
+        function updateStatus() {
+            const statusArea = document.getElementById('statusArea');
+            if (!isListening && !isSpeaking) {
+                statusArea.innerHTML = '';
+            } else if (isSpeaking) {
+                statusArea.innerHTML = '<span class="text-emerald-400">🔊 Speaking...</span>';
+            }
+        }
+
+        function updateBotStats(stats) {
+            if (stats.level) {
+                document.getElementById('botLevel').textContent = stats.level;
+                const stages = { 1: 'Infant', 2: 'Child', 3: 'Adolescent', 4: 'Adult' };
+                const stage = stages[stats.level] || 'Adult';
+                document.getElementById('botStage').textContent = stage;
+            }
+            if (stats.wordsLearned !== undefined) {
+                document.getElementById('wordsLearned').textContent = stats.wordsLearned;
+            }
+        }
+
+        function addMessage(content, isUser) {
+            const chatArea = document.getElementById('chatArea');
+            const welcomeMessage = document.getElementById('welcomeMessage');
+            
+            if (welcomeMessage.style.display !== 'none') {
+                welcomeMessage.style.display = 'none';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = \`mb-3 fade-in \${isUser ? 'text-right' : 'text-left'}\`;
+            
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const bgClass = isUser ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600';
+            
+            messageDiv.innerHTML = \`
+                <span class="inline-block px-4 py-2 rounded-xl max-w-xs \${bgClass}">
+                    <div class="text-sm leading-relaxed">\${content}</div>
+                    <div class="text-xs opacity-70 mt-1">\${time}</div>
+                </span>
+            \`;
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function showTyping() {
+            const chatArea = document.getElementById('chatArea');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'text-left mb-3';
+            typingDiv.innerHTML = \`
+                <div class="bg-gray-700 border border-gray-600 px-4 py-2 rounded-xl inline-block">
+                    <div class="flex space-x-1">
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+                    </div>
+                </div>
+            \`;
+            chatArea.appendChild(typingDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function hideTyping() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) typingIndicator.remove();
+        }
+
+        async function speakText(text) {
+            try {
+                setSpeaking(true);
+                const response = await fetch('/api/text-to-speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.onended = () => {
+                        setSpeaking(false);
+                        URL.revokeObjectURL(audioUrl);
+                    };
+                    await audioPlayer.play();
+                } else {
+                    setSpeaking(false);
+                }
+            } catch (error) {
+                console.error('Speech error:', error);
+                setSpeaking(false);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || isLoading) return;
+
+            addMessage(message, true);
+            input.value = '';
+            isLoading = true;
+            showTyping();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, botId: 1 })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    hideTyping();
+                    addMessage(data.response, false);
+                    
+                    updateBotStats({
+                        level: data.level,
+                        wordsLearned: data.wordsLearned
+                    });
+                    
+                    await speakText(data.response);
+                } else {
+                    hideTyping();
+                    addMessage('Sorry, I had trouble processing that. Please try again.', false);
+                }
+            } catch (error) {
+                console.error('Chat error:', error);
+                hideTyping();
+                addMessage('Sorry, I had trouble processing that. Please try again.', false);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        document.getElementById('voiceBtn').addEventListener('click', () => {
+            if (recognition && !isListening) {
+                setListening(true);
+                recognition.start();
+            }
+        });
+
+        // Initialize bot
+        fetch('/api/bot/1').catch(() => {
+            fetch('/api/bot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: 1,
+                    name: 'Mirror',
+                    level: 1,
+                    wordsLearned: 0,
+                    personalityTraits: { enthusiasm: 1, humor: 1, curiosity: 2 }
+                })
+            });
+        });
+    </script>
+</body>
+</html>`);
   });
 
   return httpServer;
