@@ -387,46 +387,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const audioPath = req.file.path;
+      const convertedPath = audioPath.replace(/\.[^/.]+$/, '.wav');
       
-      // Debug: Log the file information
-      console.log('Audio file info:', {
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size
+      // Convert audio to WAV format using ffmpeg
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(audioPath)
+          .toFormat('wav')
+          .audioCodec('pcm_s16le')
+          .audioChannels(1)
+          .audioFrequency(16000)
+          .save(convertedPath)
+          .on('end', () => resolve())
+          .on('error', (err) => reject(err));
       });
       
-      // Create a proper file stream with the correct filename for Whisper
-      let fileName = 'audio.wav';
-      if (req.file.originalname?.includes('.mp4')) {
-        fileName = 'audio.mp4';
-      } else if (req.file.originalname?.includes('.mp3')) {
-        fileName = 'audio.mp3';
-      } else if (req.file.originalname?.includes('.webm')) {
-        fileName = 'audio.webm';
-      }
-      
-      const fileStream = fs.createReadStream(audioPath);
-      // Override the filename in the stream for Whisper API
-      (fileStream as any).path = fileName;
-      
       const transcription = await openai.audio.transcriptions.create({
-        file: fileStream,
+        file: fs.createReadStream(convertedPath),
         model: 'whisper-1',
         language: 'en',
         temperature: 0.2
       });
 
-      // Clean up uploaded file
+      // Clean up both files
       fs.unlinkSync(audioPath);
+      fs.unlinkSync(convertedPath);
       
       res.json({ text: transcription.text });
       
     } catch (error) {
       console.error('Transcription error:', error);
-      // Clean up file on error too
+      // Clean up files on error too
       if (req.file?.path) {
         try {
           fs.unlinkSync(req.file.path);
+          const convertedPath = req.file.path.replace(/\.[^/.]+$/, '.wav');
+          if (fs.existsSync(convertedPath)) {
+            fs.unlinkSync(convertedPath);
+          }
         } catch (cleanupError) {
           console.error('File cleanup error:', cleanupError);
         }
