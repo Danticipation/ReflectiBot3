@@ -673,21 +673,44 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
                 <input 
                     type="text" 
                     id="messageInput" 
-                    placeholder="Start talking with Reflectibot..."
+                    placeholder="Type or speak your message..."
                     class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                 />
                 <button 
                     id="sendBtn" 
-                    class="bg-emerald-600 hover:bg-emerald-700 px-6 py-2 rounded-lg font-medium transition-colors"
+                    class="mood-accent hover:opacity-80 px-6 py-2 rounded-lg font-medium transition-all text-white"
                 >
                     Send
                 </button>
                 <button 
-                    id="voiceBtn" 
-                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                    id="voiceInputBtn" 
+                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors relative"
+                    title="Click to speak"
+                >
+                    <span id="voiceIcon">🎤</span>
+                    <div id="voiceStatus" class="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-300 hidden">
+                        Listening...
+                    </div>
+                </button>
+                <button 
+                    id="speakBtn" 
+                    class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+                    title="Replay last response"
                 >
                     🔊
                 </button>
+            </div>
+            
+            <!-- Voice Controls Status -->
+            <div class="mt-2 text-xs text-gray-400 flex justify-between items-center">
+                <div id="voiceSupport" class="hidden">
+                    <span class="text-green-400">🎤 Voice input ready</span>
+                </div>
+                <div id="speechStatus" class="text-gray-500">
+                    <span id="isListening" class="hidden text-blue-400">🎤 Listening...</span>
+                    <span id="isSpeaking" class="hidden text-purple-400">🔊 Speaking...</span>
+                </div>
+                <span>Press Enter to send or click 🎤 to speak</span>
             </div>
             
             <!-- Enhanced Memory Dashboard -->
@@ -864,6 +887,12 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
                 // Add bot response
                 addMessage('bot', data.response);
                 
+                // Store last response for voice replay
+                lastBotResponse = data.response;
+                
+                // Automatically speak the bot's response
+                speakText(data.response);
+                
                 // Update UI
                 updateStats();
                 loadMemories();
@@ -924,15 +953,30 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
             if (e.key === 'Enter') sendMessage();
         };
         
-        document.getElementById('voiceBtn').onclick = () => {
-            const messages = document.getElementById('messages');
-            const lastBotMessage = [...messages.children].reverse().find(el => 
-                el.querySelector('.text-emerald-400')
-            );
-            
-            if (lastBotMessage) {
-                const text = lastBotMessage.querySelector('.text-gray-300').textContent;
-                speakText(text);
+        // Voice input button
+        document.getElementById('voiceInputBtn').onclick = () => {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        };
+        
+        // Voice output button (replay last response)
+        document.getElementById('speakBtn').onclick = () => {
+            if (lastBotResponse) {
+                speakText(lastBotResponse);
+            } else {
+                // Find the last bot message if no stored response
+                const messages = document.getElementById('messages');
+                const lastBotMessage = [...messages.children].reverse().find(el => 
+                    el.querySelector('.text-emerald-400')
+                );
+                
+                if (lastBotMessage) {
+                    const text = lastBotMessage.querySelector('.text-gray-300').textContent;
+                    speakText(text);
+                }
             }
         };
         
@@ -1057,8 +1101,139 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
             }
         }
         
+        // Voice recognition setup
+        let recognition = null;
+        let isListening = false;
+        let isSpeaking = false;
+        let lastBotResponse = '';
+        
+        function initializeVoiceRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = () => {
+                    isListening = true;
+                    document.getElementById('voiceIcon').textContent = '🔴';
+                    document.getElementById('voiceStatus').classList.remove('hidden');
+                    document.getElementById('isListening').classList.remove('hidden');
+                    document.getElementById('voiceInputBtn').classList.add('animate-pulse');
+                };
+                
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('messageInput').value = transcript;
+                    sendMessage(); // Automatically send the transcribed message
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    stopListening();
+                };
+                
+                recognition.onend = () => {
+                    stopListening();
+                };
+                
+                // Show voice support indicator
+                document.getElementById('voiceSupport').classList.remove('hidden');
+            }
+        }
+        
+        function startListening() {
+            if (recognition && !isListening) {
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.error('Failed to start speech recognition:', error);
+                }
+            }
+        }
+        
+        function stopListening() {
+            isListening = false;
+            document.getElementById('voiceIcon').textContent = '🎤';
+            document.getElementById('voiceStatus').classList.add('hidden');
+            document.getElementById('isListening').classList.add('hidden');
+            document.getElementById('voiceInputBtn').classList.remove('animate-pulse');
+            
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+        
+        async function speakText(text) {
+            if (isSpeaking) return;
+            
+            try {
+                isSpeaking = true;
+                document.getElementById('isSpeaking').classList.remove('hidden');
+                document.getElementById('speakBtn').classList.add('animate-pulse');
+                
+                // Try ElevenLabs TTS first
+                const response = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audioUrl);
+                        stopSpeaking();
+                    };
+                    
+                    audio.onerror = () => {
+                        URL.revokeObjectURL(audioUrl);
+                        fallbackToWebSpeech(text);
+                    };
+                    
+                    await audio.play();
+                } else {
+                    // Fallback to browser speech synthesis
+                    fallbackToWebSpeech(text);
+                }
+            } catch (error) {
+                console.error('TTS error:', error);
+                fallbackToWebSpeech(text);
+            }
+        }
+        
+        function fallbackToWebSpeech(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1.0;
+                utterance.volume = 0.8;
+                
+                utterance.onend = () => stopSpeaking();
+                utterance.onerror = () => stopSpeaking();
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                stopSpeaking();
+            }
+        }
+        
+        function stopSpeaking() {
+            isSpeaking = false;
+            document.getElementById('isSpeaking').classList.add('hidden');
+            document.getElementById('speakBtn').classList.remove('animate-pulse');
+        }
+
         // Load dashboard on startup
         loadMemoryDashboard();
+        
+        // Initialize voice recognition
+        initializeVoiceRecognition();
         
         // Refresh dashboard every 10 seconds
         setInterval(loadMemoryDashboard, 10000);

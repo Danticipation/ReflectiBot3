@@ -1,0 +1,98 @@
+// 📁 client/src/hooks/useVoiceInput.ts
+
+import { useEffect, useRef, useState } from 'react';
+
+export function useVoiceInput(onTranscript: (text: string) => void) {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window)) return;
+
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      onTranscript(transcript);
+    };
+
+    recognition.onerror = (e: any) => console.error('Speech error', e);
+    recognitionRef.current = recognition;
+  }, [onTranscript]);
+
+  const startListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      setListening(true);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+    }
+  };
+
+  return { startListening, stopListening, listening };
+}
+
+
+// 📁 client/src/utils/speak.ts
+
+export const speakWithElevenLabs = async (text: string, voiceId: string = 'YOUR_DEFAULT_VOICE_ID') => {
+  const res = await fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voiceId })
+  });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.play();
+};
+
+
+// 📁 client/src/components/VoiceChat.tsx
+
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { speakWithElevenLabs } from '../utils/speak';
+import { useState } from 'react';
+
+export default function VoiceChat() {
+  const [response, setResponse] = useState('');
+
+  const handleTranscript = async (text: string) => {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'user123', message: text })
+    });
+
+    const data = await res.json();
+    setResponse(data.reply);
+    speakWithElevenLabs(data.reply);
+  };
+
+  const { startListening, stopListening, listening } = useVoiceInput(handleTranscript);
+
+  return (
+    <div className="text-white p-4 bg-gray-900 rounded-xl">
+      <button
+        className={`px-4 py-2 rounded ${listening ? 'bg-red-500' : 'bg-green-500'}`}
+        onClick={listening ? stopListening : startListening}
+      >
+        {listening ? 'Stop Listening' : 'Start Talking'}
+      </button>
+      {response && (
+        <div className="mt-4">
+          <p className="text-sm text-gray-400">Bot says:</p>
+          <p className="text-lg font-medium">{response}</p>
+        </div>
+      )}
+    </div>
+  );
+}
