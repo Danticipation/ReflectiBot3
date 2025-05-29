@@ -39,8 +39,8 @@ export const bots = pgTable("bots", {
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   botId: integer("bot_id").notNull(),
-  content: text("content").notNull(),
-  isUser: boolean("is_user").notNull(),
+  sender: text("sender").notNull(),
+  text: text("text").notNull(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
