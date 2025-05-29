@@ -1,8 +1,9 @@
 import { 
-  users, bots, messages, learnedWords, milestones,
+  users, bots, messages, learnedWords, milestones, userMemories, userFacts,
   type User, type InsertUser, type Bot, type InsertBot,
   type Message, type InsertMessage, type LearnedWord, type InsertLearnedWord,
-  type Milestone, type InsertMilestone 
+  type Milestone, type InsertMilestone, type UserMemory, type InsertUserMemory,
+  type UserFact, type InsertUserFact
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -153,6 +154,30 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return milestone;
+  }
+
+  async getUserMemories(userId: number): Promise<UserMemory[]> {
+    return await db.select().from(userMemories).where(eq(userMemories.userId, userId));
+  }
+
+  async createUserMemory(insertMemory: InsertUserMemory): Promise<UserMemory> {
+    const [memory] = await db
+      .insert(userMemories)
+      .values(insertMemory)
+      .returning();
+    return memory;
+  }
+
+  async getUserFacts(userId: number): Promise<UserFact[]> {
+    return await db.select().from(userFacts).where(eq(userFacts.userId, userId));
+  }
+
+  async createUserFact(insertFact: InsertUserFact): Promise<UserFact> {
+    const [fact] = await db
+      .insert(userFacts)
+      .values(insertFact)
+      .returning();
+    return fact;
   }
 }
 
