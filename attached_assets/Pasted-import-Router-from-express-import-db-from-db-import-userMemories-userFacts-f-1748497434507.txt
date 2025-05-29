@@ -1,0 +1,62 @@
+import { Router } from 'express';
+import { db } from '../db';
+import { userMemories, userFacts } from '../schema'; // adjust import path as needed
+import { eq, and, gte } from 'drizzle-orm';
+import { OpenAI } from 'openai';
+import dayjs from 'dayjs';
+
+const router = Router();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+router.get('/weekly-summary', async (req, res) => {
+  try {
+    const userId = parseInt(req.query.userId as string);
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    const oneWeekAgo = dayjs().subtract(7, 'days').toISOString();
+
+    // Fetch recent words & facts
+    const recentWords = await db
+      .select()
+      .from(userMemories)
+      .where(and(eq(userMemories.userId, userId), gte(userMemories.createdAt, oneWeekAgo)));
+
+    const recentFacts = await db
+      .select()
+      .from(userFacts)
+      .where(and(eq(userFacts.userId, userId), gte(userFacts.createdAt, oneWeekAgo)));
+
+    // Format data for GPT
+    const wordList = [...new Set(recentWords.map(w => w.word))].join(', ');
+    const factList = recentFacts.map(f => `${f.key}: ${f.value}`).join('\\n');
+
+    const prompt = `
+You are Reflectibot™, an introspective AI who generates weekly memory summaries.
+Here is what the user has discussed or recorded this week:
+
+WORDS:
+${wordList}
+
+FACTS / JOURNAL ENTRIES:
+${factList}
+
+Write a short, warm, emotionally intelligent summary of the user's week.
+Make it feel personal, as if you're reflecting their emotional state and growth.
+Use a friendly tone.`;
+
+    const chatResponse = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 300,
+    });
+
+    const summary = chatResponse.choices[0]?.message?.content?.trim();
+
+    return res.json({ summary: summary || 'No summary available.' });
+  } catch (error) {
+    console.error('[Weekly Summary Error]', error);
+    return res.status(500).json({ error: 'Something went wrong generating the summary.' });
+  }
+});
+
+export default router;

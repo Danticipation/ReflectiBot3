@@ -3,10 +3,12 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { db } from "./db";
-import { userMemories } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { userMemories, userFacts } from "@shared/schema";
+import { eq, and, gte } from "drizzle-orm";
 import { insertBotSchema, insertMessageSchema, type ChatMessage, type LearningUpdate } from "@shared/schema";
 import { z } from "zod";
+import { OpenAI } from "openai";
+import dayjs from "dayjs";
 
 // Simple NLP for extracting keywords
 function extractKeywords(text: string): string[] {
@@ -438,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ newWords, totalWordCount, stage });
   });
 
-  // Weekly summary endpoint
+  // Enhanced weekly summary endpoint with OpenAI
   app.get("/api/weekly-summary", async (req, res) => {
     try {
       const { userId } = req.query;
@@ -446,35 +448,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ error: 'userId is required' });
       }
+
+      const userIdInt = parseInt(userId as string);
+      const oneWeekAgo = dayjs().subtract(7, 'days').toDate();
+
+      // Fetch recent words & facts from the past week
+      const recentWords = await db.select().from(userMemories)
+        .where(and(
+          eq(userMemories.userId, userIdInt),
+          gte(userMemories.createdAt, oneWeekAgo)
+        ));
+
+      const recentFacts = await db.select().from(userFacts)
+        .where(and(
+          eq(userFacts.userId, userIdInt),
+          gte(userFacts.createdAt, oneWeekAgo)
+        ));
+
+      // Check if we have any data to work with
+      if (recentWords.length === 0 && recentFacts.length === 0) {
+        return res.json({ 
+          summary: "Start chatting with your Mirror Bot to build your weekly reflection summary! Share your thoughts, feelings, and experiences." 
+        });
+      }
+
+      // Initialize OpenAI client
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // Format data for GPT
+      const wordList = [...new Set(recentWords.map(w => w.word))].join(', ');
+      const factList = recentFacts.map(f => `${f.key}: ${f.value}`).join('\n');
+
+      const prompt = `
+You are Reflectibot™, an introspective AI who generates weekly memory summaries.
+Here is what the user has discussed or recorded this week:
+
+WORDS:
+${wordList}
+
+FACTS / JOURNAL ENTRIES:
+${factList}
+
+Write a short, warm, emotionally intelligent summary of the user's week.
+Make it feel personal, as if you're reflecting their emotional state and growth.
+Use a friendly tone and keep it under 200 words.`;
+
+      const chatResponse = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+      });
+
+      const summary = chatResponse.choices[0]?.message?.content?.trim();
+
+      res.setHeader('Content-Type', 'application/json');
+      return res.json({ summary: summary || 'No summary available.' });
+    } catch (error) {
+      console.error('Failed to generate weekly summary:', error);
       
-      // Get user memories
-      const recentMemories = await db.select().from(userMemories)
-        .where(eq(userMemories.userId, parseInt(userId as string)));
+      // Fallback to basic summary if OpenAI fails
+      const totalWords = await db.select().from(userMemories)
+        .where(eq(userMemories.userId, parseInt(req.query.userId as string)));
       
-      const totalWords = recentMemories.length;
-      const stage = getMilestoneStage(totalWords);
-      
-      // Generate summary based on actual data
-      let summary = "";
-      
-      if (totalWords === 0) {
-        summary = "Start chatting with your Mirror Bot to build your weekly reflection summary! Share your thoughts, feelings, and experiences.";
-      } else {
-        summary = `This week you've been exploring new vocabulary and expressing yourself! 
+      const stage = getMilestoneStage(totalWords.length);
+      const fallbackSummary = `This week you've been exploring new vocabulary and expressing yourself! 
 
 🌱 Growth Summary:
-- Words learned: ${totalWords}
+- Words learned: ${totalWords.length}
 - Current stage: ${stage}
 - Active engagement with self-reflection
 
-Your Mirror Bot has been learning from your unique way of expressing thoughts and feelings. Keep sharing your inner world to help it understand you better!`;
-      }
+Your Mirror Bot has been learning from your unique way of expressing thoughts and feelings.`;
 
-      res.setHeader('Content-Type', 'application/json');
-      return res.json({ summary });
-    } catch (error) {
-      console.error('Failed to generate weekly summary:', error);
-      res.status(500).json({ error: 'Failed to generate summary' });
+      res.status(500).json({ summary: fallbackSummary });
     }
   });
 
