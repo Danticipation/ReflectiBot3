@@ -166,8 +166,8 @@ export class DatabaseStorage implements IStorage {
       .values({
         userId: insertMemory.userId,
         memory: insertMemory.memory,
-        category: insertMemory.category,
-        importance: insertMemory.importance
+        category: insertMemory.category || 'conversation',
+        importance: insertMemory.importance || 'medium'
       })
       .returning();
     return memory;

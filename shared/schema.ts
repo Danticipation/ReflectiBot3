@@ -10,16 +10,19 @@ export const users = pgTable("users", {
 
 export const userMemories = pgTable("user_memories", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id),
-  word: text("word").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  memory: text("memory").notNull(),
+  category: text("category").default('conversation'),
+  importance: text("importance").default('medium'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const userFacts = pgTable("user_facts", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id),
-  key: text("key").notNull(),
-  value: text("value").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  fact: text("fact").notNull(),
+  category: text("category").default('personal'),
+  confidence: text("confidence").default('medium'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
