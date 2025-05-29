@@ -151,14 +151,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, botId } = req.body;
       const userId = 1; // Default user for demo
 
-      // Get or create bot
+      // Get or create bot with previous progress
       let bot = await storage.getBotByUserId(userId);
       if (!bot) {
         bot = await storage.createBot({
           userId,
           name: "Reflectibot",
-          personality: "curious and learning",
-          level: 1
+          level: 4, // Adolescent stage
+          wordsLearned: 57
+        });
+
+        // Initialize with some learned words to reflect previous progress
+        const progressWords = [
+          "hello", "conversation", "learning", "mirror", "personality", "growth", "curious", "development",
+          "words", "talking", "interesting", "questions", "thoughts", "feelings", "experiences", "memories",
+          "understanding", "communication", "knowledge", "wisdom", "reflection", "progress", "evolution",
+          "intelligence", "awareness", "consciousness", "perception", "insights", "discoveries", "connections",
+          "relationships", "emotions", "empathy", "compassion", "creativity", "imagination", "inspiration",
+          "motivation", "goals", "aspirations", "dreams", "hopes", "future", "past", "present", "time",
+          "space", "reality", "truth", "meaning", "purpose", "significance", "importance", "value", "worth",
+          "potential", "possibilities", "opportunities", "challenges", "obstacles", "solutions"
+        ];
+
+        for (const word of progressWords) {
+          await storage.createOrUpdateWord({
+            botId: bot.id,
+            word,
+            frequency: Math.floor(Math.random() * 5) + 1
+          });
+        }
+
+        // Initialize with previous conversation facts and memories
+        await storage.createUserFact({
+          userId,
+          fact: "User has a cat named Whiskers",
+          category: "pets"
+        });
+
+        await storage.createUserFact({
+          userId,
+          fact: "User experiences work stress",
+          category: "emotional_state"
+        });
+
+        await storage.createUserMemory({
+          userId,
+          memory: "Had a conversation about work stress and the user's cat Whiskers provided comfort",
+          category: "emotional_support"
+        });
+
+        await storage.createUserMemory({
+          userId,
+          memory: "User is testing the advanced voice and memory capabilities of the bot",
+          category: "interaction_context"
         });
       }
 
