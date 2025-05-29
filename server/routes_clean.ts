@@ -379,6 +379,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Weekly summary endpoint
+  router.get('/api/weekly-summary', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string) || 1;
+      
+      // Get recent memories and facts for summary generation
+      const memories = await storage.getUserMemories(userId);
+      const facts = await storage.getUserFacts(userId);
+      
+      if (memories.length === 0 && facts.length === 0) {
+        return res.json({ summary: 'No memories or reflections available yet. Start chatting with me to build our conversation history!' });
+      }
+
+      // Create summary context from recent interactions
+      const summaryContext = {
+        userMessages: memories.map(m => m.memory),
+        botResponses: [],
+        timeframe: 'recent',
+        userFacts: facts.map(f => f.fact),
+        emotionalTone: 'reflective',
+        stage: getStageFromWordCount(183) // Current stage based on word count
+      };
+
+      // Generate summary using the loopback summary system
+      const summary = await generateLoopbackSummary(summaryContext);
+      const formattedSummary = formatSummaryForDisplay(summary);
+      
+      res.json({ summary: formattedSummary });
+      
+    } catch (error) {
+      console.error('Weekly summary error:', error);
+      res.json({ summary: 'Unable to generate reflection summary at this time. Please try again later.' });
+    }
+  });
+
   // Whisper transcription endpoint
   router.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     try {
