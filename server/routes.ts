@@ -162,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update personality traits
-      const personalityTraits = { ...bot.personalityTraits };
+      const personalityTraits = Object.assign({}, bot.personalityTraits || { enthusiasm: 1, humor: 1, curiosity: 2 });
       const enthusiasmWords = ['love', 'amazing', 'awesome', 'great', 'fantastic'];
       const humorWords = ['funny', 'hilarious', 'joke', 'laugh', 'lol'];
       
