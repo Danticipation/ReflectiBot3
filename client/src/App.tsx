@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import WhisperRecorder from './components/WhisperRecorder';
 import MemoryDashboard from './components/MemoryDashboard';
+import VoiceSelector from './components/VoiceSelector';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ const AppComponent = () => {
   const [weeklySummary, setWeeklySummary] = useState<string>('');
   const [showReflection, setShowReflection] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 
@@ -248,6 +250,12 @@ const AppComponent = () => {
                 📘 Reflection
               </button>
               <button 
+                onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                🎙️ Voice
+              </button>
+              <button 
                 onClick={() => setShowUserSwitch(!showUserSwitch)}
                 className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
               >
@@ -295,6 +303,30 @@ const AppComponent = () => {
               </button>
             </div>
             <MemoryDashboard userId={1} />
+          </div>
+        </div>
+      )}
+
+      {/* Voice Selector Modal */}
+      {showVoiceSelector && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-200">Voice Selection</h3>
+              <button 
+                onClick={() => setShowVoiceSelector(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <VoiceSelector 
+              userId={1} 
+              onVoiceChange={(voice) => {
+                console.log('Voice changed to:', voice.name);
+                // Voice change will be handled automatically by the component
+              }}
+            />
           </div>
         </div>
       )}

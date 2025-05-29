@@ -9,6 +9,7 @@ import { detectIntent, generateResponseStrategy, type ConversationContext } from
 import { analyzeMemoryImportance, type MemoryAnalysis } from "./memoryImportance.js";
 import { extractTimeContext, generateTimeBasedContext, shouldPrioritizeMemory } from "./timestampLabeling.js";
 import { selectVoiceForMood, getVoiceSettings } from "./dynamicVoice.js";
+import { baseVoices, getVoiceById, defaultVoiceId } from "./voiceConfig.js";
 import { generateLoopbackSummary, formatSummaryForDisplay, type SummaryContext } from "./loopbackSummary.js";
 import express from "express";
 import path from "path";
@@ -469,7 +470,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced ElevenLabs text-to-speech endpoint with dynamic voice selection
+  // Voice selection endpoints
+  router.get('/api/voices', async (req, res) => {
+    try {
+      res.json({ voices: baseVoices });
+    } catch (error) {
+      console.error('Voice list error:', error);
+      res.status(500).json({ error: 'Failed to get voices' });
+    }
+  });
+
+  router.get('/api/voice/current', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string) || 1;
+      
+      // Get user's selected voice from user facts
+      const facts = await storage.getUserFacts(userId);
+      const voiceFact = facts.find(f => f.category === 'voice_preference');
+      
+      if (voiceFact) {
+        const voiceId = voiceFact.fact.replace('User prefers voice: ', '');
+        const voice = getVoiceById(voiceId);
+        res.json({ voice });
+      } else {
+        const defaultVoice = getVoiceById(defaultVoiceId);
+        res.json({ voice: defaultVoice });
+      }
+    } catch (error) {
+      console.error('Get current voice error:', error);
+      res.status(500).json({ error: 'Failed to get current voice' });
+    }
+  });
+
+  router.post('/api/voice/select', async (req, res) => {
+    try {
+      const { voiceId, userId = 1 } = req.body;
+      
+      if (!voiceId) {
+        return res.status(400).json({ error: 'Voice ID is required' });
+      }
+
+      const voice = getVoiceById(voiceId);
+      if (!voice) {
+        return res.status(400).json({ error: 'Invalid voice ID' });
+      }
+
+      // Remove existing voice preference
+      const facts = await storage.getUserFacts(userId);
+      const existingVoiceFact = facts.find(f => f.category === 'voice_preference');
+      if (existingVoiceFact) {
+        // We would need a delete method, for now just add a new one
+      }
+
+      // Store new voice preference
+      await storage.createUserFact({
+        userId,
+        fact: `User prefers voice: ${voiceId}`,
+        category: 'voice_preference'
+      });
+
+      res.json({ success: true, voice });
+    } catch (error) {
+      console.error('Voice selection error:', error);
+      res.status(500).json({ error: 'Failed to select voice' });
+    }
+  });
+
+  // Enhanced ElevenLabs text-to-speech endpoint with user voice selection
   router.post('/api/text-to-speech', async (req, res) => {
     try {
       const { text, userId = 1 } = req.body;
@@ -478,13 +545,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Text is required' });
       }
 
-      // Detect current mood and stage for dynamic voice selection
-      const bot = await storage.getBotByUserId(userId);
-      const stage = bot ? getStageFromWordCount((await storage.getLearnedWords(bot.id)).length) : "Infant";
+      // Get user's selected voice preference
+      const facts = await storage.getUserFacts(userId);
+      const voiceFact = facts.find(f => f.category === 'voice_preference');
+      let voiceId = defaultVoiceId;
       
-      // Use dynamic voice settings based on bot's developmental stage
-      const voiceSettings = getVoiceSettings("neutral", stage);
-      const voiceId = selectVoiceForMood("neutral", stage);
+      if (voiceFact) {
+        voiceId = voiceFact.fact.replace('User prefers voice: ', '');
+      }
+
+      // Use selected voice with neutral settings
+      const voiceSettings = {
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.0,
+        use_speaker_boost: true
+      };
 
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
