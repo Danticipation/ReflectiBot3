@@ -12,10 +12,15 @@ import { selectVoiceForMood, getVoiceSettings } from "./dynamicVoice.js";
 import { generateLoopbackSummary, formatSummaryForDisplay, type SummaryContext } from "./loopbackSummary.js";
 import express from "express";
 import path from "path";
+import multer from "multer";
+import fs from "fs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Configure multer for audio uploads
+const upload = multer({ dest: 'uploads/' });
 
 // Learning stage tracker
 function getStageFromWordCount(wordCount: number): string {
@@ -324,6 +329,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Memories error:', error);
       res.status(500).json({ error: 'Failed to get memories' });
+    }
+  });
+
+  // Whisper transcription endpoint
+  router.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Audio file is required' });
+      }
+
+      const audioPath = req.file.path;
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(audioPath));
+      formData.append('model', 'whisper-1');
+
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Whisper transcription failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Clean up uploaded file
+      fs.unlinkSync(audioPath);
+      
+      res.json({ text: result.text });
+      
+    } catch (error) {
+      console.error('Transcription error:', error);
+      // Clean up file on error too
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error('File cleanup error:', cleanupError);
+        }
+      }
+      res.status(500).json({ error: 'Transcription failed' });
     }
   });
 
