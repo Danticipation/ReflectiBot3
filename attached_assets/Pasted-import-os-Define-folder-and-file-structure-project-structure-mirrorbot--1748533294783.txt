@@ -1,0 +1,90 @@
+import os
+
+# Define folder and file structure
+project_structure = {
+    "mirrorbot": {
+        "client": {
+            "src": {
+                "App.tsx": """\
+import { useEffect, useState } from 'react';
+
+function App() {
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/test')
+      .then(res => res.json())
+      .then(data => setMsg(data.message));
+  }, []);
+
+  return <h1>{msg}</h1>;
+}
+
+export default App;
+"""
+            },
+            "vite.config.ts": """\
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:5000'
+    }
+  }
+});
+"""
+        },
+        "server": {
+            "index.ts": """\
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/test', (_req, res) => {
+  res.json({ message: 'It works!' });
+});
+
+const PORT = 5000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+"""
+        },
+        "package.json": """\
+{
+  "name": "mirrorbot",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \\"npm:start --prefix server\\" \\"npm:start --prefix client\\"",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  }
+}
+"""
+    }
+}
+
+# Function to create directory structure and files
+def create_structure(base_path, structure):
+    for name, content in structure.items():
+        path = os.path.join(base_path, name)
+        if isinstance(content, dict):
+            os.makedirs(path, exist_ok=True)
+            create_structure(path, content)
+        else:
+            with open(path, 'w') as f:
+                f.write(content)
+
+# Create the scaffold
+base_path = "/mnt/data"
+create_structure(base_path, project_structure)
+
+"✅ Folder scaffold for 'mirrorbot' created. Ready for download and setup."
