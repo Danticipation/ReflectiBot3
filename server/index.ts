@@ -6,6 +6,14 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Fix MIME type for JavaScript modules
+app.use((req, res, next) => {
+  if (req.url.endsWith('.js') || req.url.endsWith('.tsx') || req.url.endsWith('.ts')) {
+    res.setHeader('Content-Type', 'application/javascript');
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
