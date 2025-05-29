@@ -27,12 +27,13 @@ export default function MemoryDashboard({ userId = 1 }: { userId?: number }) {
     refetchInterval: 5000 // Refresh every 5 seconds
   });
 
-  const { data: facts = [], isLoading: factsLoading } = useQuery<Memory[]>({
-    queryKey: ['/api/memory/list', userId, 'fact'],
+  const { data: memories = [], isLoading: memoriesLoading } = useQuery<Memory[]>({
+    queryKey: ['/api/memories', userId],
     queryFn: async () => {
-      const response = await fetch(`/api/memory/list?userId=${userId}&type=fact`);
-      if (!response.ok) throw new Error('Failed to fetch facts');
-      return response.json();
+      const response = await fetch(`/api/memories?userId=${userId}`);
+      if (!response.ok) throw new Error('Failed to fetch memories');
+      const data = await response.json();
+      return data.memories || [];
     },
     refetchInterval: 5000
   });
@@ -129,26 +130,26 @@ export default function MemoryDashboard({ userId = 1 }: { userId?: number }) {
           Facts About You
         </h3>
         
-        {factsLoading ? (
+        {memoriesLoading ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-4 bg-gray-700 rounded animate-pulse"></div>
             ))}
           </div>
-        ) : facts.length === 0 ? (
+        ) : memories.length === 0 ? (
           <p className="text-gray-400 italic">
-            No facts learned yet. Tell me about yourself to help me remember!
+            No memories recorded yet. Continue chatting to build our conversation history!
           </p>
         ) : (
           <div className="space-y-3 max-h-64 overflow-y-auto">
-            {facts.slice(-10).reverse().map((fact) => (
+            {memories.slice(-10).reverse().map((memory) => (
               <div 
-                key={fact.id} 
+                key={memory.id} 
                 className="p-3 bg-gray-700/50 rounded-lg border-l-4 border-emerald-500"
               >
-                <div className="text-gray-300">{fact.memory}</div>
+                <div className="text-gray-300">{memory.memory}</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  {new Date(fact.createdAt).toLocaleDateString()}
+                  {new Date(memory.createdAt).toLocaleDateString()}
                 </div>
               </div>
             ))}
