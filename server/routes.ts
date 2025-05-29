@@ -596,15 +596,53 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
                 </button>
             </div>
             
-            <!-- Memory Panel -->
-            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <h3 class="text-lg font-semibold mb-2 text-emerald-400">📚 Learned Words</h3>
-                    <div id="wordsList" class="text-sm text-gray-300">Loading...</div>
+            <!-- Enhanced Memory Dashboard -->
+            <div class="mt-6 space-y-4">
+                <!-- Progress Overview -->
+                <div class="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-lg border border-gray-700">
+                    <h3 class="text-xl font-semibold mb-4 text-emerald-400">🧠 Memory Growth Dashboard</h3>
+                    <div id="progressInfo">Loading progress...</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <h3 class="text-lg font-semibold mb-2 text-blue-400">🧠 Facts About You</h3>
-                    <div id="factsList" class="text-sm text-gray-300">Loading...</div>
+                
+                <!-- Facts and Memories Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold mb-3 text-emerald-400 flex items-center">
+                            <span class="mr-2">📌</span>
+                            Facts About You
+                        </h3>
+                        <div id="factsList" class="text-sm text-gray-300 max-h-64 overflow-y-auto">Loading...</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold mb-3 text-blue-400 flex items-center">
+                            <span class="mr-2">🎯</span>
+                            Learning Milestones
+                        </h3>
+                        <div id="milestonesList" class="text-sm text-gray-300">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
+                                    <span>👶 Infant</span>
+                                    <span class="text-xs bg-green-600 px-2 py-1 rounded">10 words - Completed</span>
+                                </div>
+                                <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
+                                    <span>🧒 Toddler</span>
+                                    <span class="text-xs bg-green-600 px-2 py-1 rounded">25 words - Completed</span>
+                                </div>
+                                <div class="flex justify-between items-center p-2 bg-emerald-600/20 border border-emerald-500 rounded">
+                                    <span>👦 Child</span>
+                                    <span class="text-xs bg-orange-600 px-2 py-1 rounded">50 words - In Progress</span>
+                                </div>
+                                <div class="flex justify-between items-center p-2 bg-gray-700/30 rounded">
+                                    <span>👨‍🎓 Adolescent</span>
+                                    <span class="text-xs bg-gray-600 px-2 py-1 rounded">100 words - Locked</span>
+                                </div>
+                                <div class="flex justify-between items-center p-2 bg-gray-700/30 rounded">
+                                    <span>🧠 Adult</span>
+                                    <span class="text-xs bg-gray-600 px-2 py-1 rounded">1000 words - Locked</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -806,6 +844,70 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
         
         // Auto-focus input
         document.getElementById('messageInput').focus();
+        
+        // Enhanced memory dashboard functions
+        async function loadMemoryDashboard() {
+            try {
+                const statsResponse = await fetch('/api/stats?userId=1');
+                const statsData = await statsResponse.json();
+                
+                const factsResponse = await fetch('/api/memory/list?userId=1&type=fact');
+                const factsData = await factsResponse.json();
+                
+                updateMemoryDashboard(statsData, factsData);
+            } catch (error) {
+                console.error('Failed to load memory dashboard:', error);
+            }
+        }
+        
+        function updateMemoryDashboard(stats, facts) {
+            // Update header stats
+            document.getElementById('stage').textContent = stats.stage;
+            document.getElementById('wordCount').textContent = \`Words: \${stats.wordCount}\`;
+            
+            // Update progress info
+            const progressPercent = (stats.wordCount / stats.nextStageAt) * 100;
+            const progressInfo = document.getElementById('progressInfo');
+            if (progressInfo) {
+                progressInfo.innerHTML = \`
+                    <div class="mb-2 text-sm">Progress to Next Stage: \${stats.wordCount}/\${stats.nextStageAt} words</div>
+                    <div class="w-full bg-gray-700 rounded-full h-2 mb-4">
+                        <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: \${Math.min(progressPercent, 100)}%"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 text-center text-sm">
+                        <div class="bg-gray-700/50 p-3 rounded">
+                            <div class="text-xl font-bold text-blue-400">\${stats.wordCount}</div>
+                            <div class="text-gray-400">Words Learned</div>
+                        </div>
+                        <div class="bg-gray-700/50 p-3 rounded">
+                            <div class="text-xl font-bold text-emerald-400">\${stats.factCount}</div>
+                            <div class="text-gray-400">Facts Remembered</div>
+                        </div>
+                        <div class="bg-gray-700/50 p-3 rounded">
+                            <div class="text-xl font-bold text-purple-400">\${stats.memoryCount}</div>
+                            <div class="text-gray-400">Conversations</div>
+                        </div>
+                    </div>
+                \`;
+            }
+            
+            // Update facts list
+            const factsList = document.getElementById('factsList');
+            if (factsList && facts.length > 0) {
+                factsList.innerHTML = facts.slice(-5).reverse().map(fact => 
+                    \`<div class="mb-2 p-2 bg-gray-700/50 rounded border-l-4 border-emerald-500">
+                        <div class="text-gray-300">\${fact.memory}</div>
+                        <div class="text-xs text-gray-500 mt-1">\${new Date(fact.createdAt).toLocaleDateString()}</div>
+                    </div>\`
+                ).join('');
+            }
+        }
+        
+        // Load dashboard on startup
+        loadMemoryDashboard();
+        
+        // Refresh dashboard every 10 seconds
+        setInterval(loadMemoryDashboard, 10000);
     </script>
 </body>
 </html>`);

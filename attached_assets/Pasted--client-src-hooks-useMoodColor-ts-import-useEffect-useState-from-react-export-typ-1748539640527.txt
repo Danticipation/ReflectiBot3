@@ -1,0 +1,89 @@
+// 📁 client/src/hooks/useMoodColor.ts
+
+import { useEffect, useState } from 'react';
+
+export type MoodColor = {
+  mood: string;
+  color: string;
+  accent: string;
+};
+
+export const useMoodColor = (userId: string) => {
+  const [moodColor, setMoodColor] = useState<MoodColor>({
+    mood: 'neutral',
+    color: '#1f2937', // default gray
+    accent: '#4b5563'
+  });
+
+  useEffect(() => {
+    const fetchMood = async () => {
+      const res = await fetch(`/api/mood?userId=${userId}`);
+      const data = await res.json();
+      setMoodColor(data);
+    };
+
+    fetchMood();
+  }, [userId]);
+
+  return moodColor;
+};
+
+
+// 📁 server/routes/mood.ts
+
+import { Router } from 'express';
+import { db } from '../db';
+import { userMemories } from '../schema';
+import { eq } from 'drizzle-orm';
+import { OpenAI } from 'openai';
+
+const router = Router();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+router.get('/api/mood', async (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  const recent = await db.select().from(userMemories).where(eq(userMemories.userId, userId));
+  const input = recent.map(m => m.memory).join('\n');
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a tone analyst. Given memory text, return the overall mood (e.g., calm, anxious, happy, reflective, sad) and a hex color + accent to represent it.'
+      },
+      {
+        role: 'user',
+        content: `Here are the user\'s recent memories:\n${input}\n\nGive me mood, primary color, and accent.`
+      }
+    ]
+  });
+
+  const text = response.choices[0]?.message?.content || 'neutral,#1f2937,#4b5563';
+  const [mood, color, accent] = text.split(',');
+  res.json({ mood, color, accent });
+});
+
+export default router;
+
+
+// 📁 client/src/App.tsx (integration example)
+
+import { useMoodColor } from './hooks/useMoodColor';
+
+function App() {
+  const { color, accent, mood } = useMoodColor('user123');
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: color }}>
+      <header className="p-4 text-white text-center" style={{ backgroundColor: accent }}>
+        <h1 className="text-xl font-bold">Reflectibot: Mood - {mood}</h1>
+      </header>
+      {/* Your other UI here */}
+    </div>
+  );
+}
+
+export default App;
