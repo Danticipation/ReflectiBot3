@@ -215,56 +215,60 @@ const AppComponent = () => {
             </button>
           </div>
           
-          <div className="flex justify-between items-center">
-            <div className="flex gap-3">
-              <WhisperRecorder 
-                onTranscription={(text) => {
-                  // Add voice input to chat history
-                  const userMessage: Message = {
-                    sender: 'user',
-                    text: text,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  };
-                  setMessages(prev => [...prev, userMessage]);
-                }} 
-                onResponse={(response) => {
-                  // Add bot response to chat history
-                  const botMessage: Message = {
-                    sender: 'bot',
-                    text: response,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  };
-                  setMessages(prev => [...prev, botMessage]);
-                }} 
-              />
-              <button 
-                onClick={() => setShowMemory(!showMemory)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                🧠 Memory
-              </button>
-              <button 
-                onClick={() => setShowReflection(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                📘 Reflection
-              </button>
-              <button 
-                onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                🎙️ Voice
-              </button>
-              <button 
-                onClick={() => setShowUserSwitch(!showUserSwitch)}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                👤 Switch User
-              </button>
-            </div>
-            <div className="text-xs text-slate-500">
-              Press Enter to send
-            </div>
+          {/* Voice Recorder */}
+          <div className="mb-4">
+            <WhisperRecorder 
+              onTranscription={(text) => {
+                // Add voice input to chat history
+                const userMessage: Message = {
+                  sender: 'user',
+                  text: text,
+                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                setMessages(prev => [...prev, userMessage]);
+              }} 
+              onResponse={(response) => {
+                // Add bot response to chat history
+                const botMessage: Message = {
+                  sender: 'bot',
+                  text: response,
+                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                setMessages(prev => [...prev, botMessage]);
+              }} 
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button 
+              onClick={() => setShowMemory(!showMemory)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+            >
+              🧠 Memory
+            </button>
+            <button 
+              onClick={() => setShowReflection(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+            >
+              📘 Reflection
+            </button>
+            <button 
+              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+              className="bg-pink-600 hover:bg-pink-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+            >
+              🎙️ Voice
+            </button>
+            <button 
+              onClick={() => setShowUserSwitch(!showUserSwitch)}
+              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+            >
+              👤 Switch User
+            </button>
+          </div>
+          
+          <div className="text-xs text-slate-500 text-center">
+            Press Enter to send
           </div>
         </div>
       </div>
