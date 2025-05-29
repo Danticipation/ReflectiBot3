@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface WhisperRecorderProps {
   onTranscription: (text: string) => void;
@@ -7,143 +7,123 @@ interface WhisperRecorderProps {
 
 export default function WhisperRecorder({ onTranscription, onResponse }: WhisperRecorderProps) {
   const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [transcription, setTranscription] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunks: BlobPart[] = [];
 
   const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Force WebM format and let server handle conversion
-      const recorder = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = mediaRecorder;
+    setRecording(true);
+    chunks.length = 0;
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const audioUrl = URL.createObjectURL(blob);
+      setAudioUrl(audioUrl);
+      setProcessing(true);
+
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+
+      try {
+        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.text) {
+          setTranscription(data.text);
+          onTranscription?.(data.text); // Pass raw transcript to parent
         }
-      };
+      } catch (err) {
+        console.error('Transcription failed:', err);
+      } finally {
+        setProcessing(false);
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
 
-      recorder.onstop = async () => {
-        setProcessing(true);
-        try {
-          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-          setAudioUrl(URL.createObjectURL(audioBlob));
-          
-          // Send to Whisper API for transcription
-          const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
-          formData.append('userId', '1');
-
-          const transcribeRes = await fetch('/api/transcribe', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (transcribeRes.ok) {
-            const transcribeData = await transcribeRes.json();
-            onTranscription(transcribeData.text);
-
-            // Send transcribed text to chat endpoint
-            const chatRes = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                message: transcribeData.text, 
-                botId: 2 
-              })
-            });
-
-            if (chatRes.ok) {
-              const chatData = await chatRes.json();
-              if (onResponse) {
-                onResponse(chatData.response);
-              }
-              
-
-
-              // Play TTS response
-              const ttsRes = await fetch('/api/text-to-speech', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: chatData.response })
-              });
-
-              if (ttsRes.ok) {
-                const audioBlob = await ttsRes.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                audio.onended = () => URL.revokeObjectURL(audioUrl);
-                audio.play();
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Processing error:', error);
-        } finally {
-          setProcessing(false);
-          // Stop all tracks to release microphone
-          stream.getTracks().forEach(track => track.stop());
-        }
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setRecording(true);
-    } catch (error) {
-      console.error('Recording error:', error);
-      setRecording(false);
-    }
+    mediaRecorder.start();
   };
 
   const stopRecording = () => {
-    if (mediaRecorder && recording) {
-      mediaRecorder.stop();
-      setRecording(false);
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const sendToBot = async () => {
+    if (!transcription) return;
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: transcription, botId: 2 })
+    });
+    const data = await res.json();
+    
+    if (onResponse) {
+      onResponse(data.response);
     }
+
+    // Play TTS response
+    const ttsRes = await fetch('/api/text-to-speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: data.response })
+    });
+
+    if (ttsRes.ok) {
+      const audioBlob = await ttsRes.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.onended = () => URL.revokeObjectURL(audioUrl);
+      audio.play();
+    }
+
+    setTranscription('');
+    setAudioUrl('');
   };
 
   return (
-    <div className="p-4 bg-gray-800 text-white rounded-xl border border-gray-700">
+    <div className="p-4 bg-gray-900 rounded-xl border border-gray-700 text-white">
       <div className="flex items-center gap-4">
         <button
           onClick={recording ? stopRecording : startRecording}
           disabled={processing}
           className={`px-6 py-3 rounded-lg font-medium transition-all ${
-            recording 
-              ? 'bg-red-600 hover:bg-red-700 animate-pulse' 
-              : processing
+            processing
               ? 'bg-gray-600 cursor-not-allowed'
+              : recording
+              ? 'bg-red-600 hover:bg-red-700 animate-pulse'
               : 'bg-emerald-600 hover:bg-emerald-700'
           }`}
         >
-          {processing ? (
-            '🔄 Processing...'
-          ) : recording ? (
-            '🔴 Stop Recording'
-          ) : (
-            '🎤 Start Whisper Recording'
-          )}
+          {processing ? '🔄 Processing...' : recording ? '⏹️ Stop Recording' : '🎤 Start Whisper Recording'}
         </button>
-        
-        {recording && (
-          <div className="flex items-center gap-2 text-red-400">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-sm">Recording...</span>
-          </div>
+        {audioUrl && (
+          <audio controls src={audioUrl} className="ml-4 max-w-xs" />
         )}
       </div>
-      
-      {audioUrl && (
+
+      {transcription && (
         <div className="mt-4">
-          <label className="text-sm text-gray-400 block mb-2">Your Recording:</label>
-          <audio controls src={audioUrl} className="w-full" />
+          <p className="text-sm text-gray-300 mb-2">📝 Transcription:</p>
+          <div className="bg-gray-800 p-3 rounded-lg border border-gray-600 mb-3">{transcription}</div>
+          <button
+            onClick={sendToBot}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            Send to Lily
+          </button>
         </div>
       )}
-      
-      <div className="mt-2 text-xs text-gray-400">
-        Uses OpenAI Whisper for high-accuracy transcription
-      </div>
     </div>
   );
 }
