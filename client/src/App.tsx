@@ -220,6 +220,46 @@ function App() {
     }
   };
 
+  const switchUser = async () => {
+    if (!newUserName.trim()) return;
+    
+    try {
+      const response = await fetch('/api/user/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newUserName.trim() })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMessages([]);
+        setNewUserName('');
+        setShowUserSwitch(false);
+        
+        // Add a system message about the switch
+        const switchMessage: Message = {
+          text: `Identity switched to ${newUserName}. Previous memories cleared. Starting fresh conversation.`,
+          sender: 'bot',
+          timestamp: new Date()
+        };
+        setMessages([switchMessage]);
+        
+        // Refresh stats after user switch
+        const statsResponse = await fetch('/api/stats?userId=1');
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setBotStats({
+            level: statsData.stage === 'Infant' ? 1 : statsData.stage === 'Toddler' ? 2 : statsData.stage === 'Child' ? 3 : statsData.stage === 'Adolescent' ? 4 : 5,
+            wordsLearned: statsData.wordCount,
+            stage: statsData.stage
+          });
+        }
+      }
+    } catch (error) {
+      console.error('User switch failed:', error);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -335,6 +375,12 @@ function App() {
           >
             📝
           </button>
+          <button 
+            onClick={() => setShowUserSwitch(!showUserSwitch)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg"
+          >
+            👤
+          </button>
         </div>
         
         <div className="mt-2 text-xs text-gray-500 flex justify-between">
@@ -401,6 +447,37 @@ function App() {
               className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
             >
               Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* User Switch */}
+      {showUserSwitch && (
+        <div className="w-full max-w-4xl mt-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold text-purple-400 mb-3">Switch User Identity</h3>
+          <p className="text-gray-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newUserName}
+              onChange={(e) => setNewUserName(e.target.value)}
+              placeholder="Enter new user name"
+              className="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+              onKeyPress={(e) => e.key === 'Enter' && switchUser()}
+            />
+            <button 
+              onClick={switchUser}
+              disabled={!newUserName.trim()}
+              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg"
+            >
+              Switch
+            </button>
+            <button 
+              onClick={() => setShowUserSwitch(false)}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+            >
+              Cancel
             </button>
           </div>
         </div>
