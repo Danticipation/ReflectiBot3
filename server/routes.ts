@@ -1,347 +1,144 @@
-import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { Express } from "express";
 import { storage } from "./storage";
-import { db } from "./db";
-import { userMemories, userFacts } from "@shared/schema";
-import { eq, and, gte } from "drizzle-orm";
-import { insertBotSchema, insertMessageSchema, type ChatMessage, type LearningUpdate } from "@shared/schema";
 import { z } from "zod";
-import { OpenAI } from "openai";
-import dayjs from "dayjs";
-
 
 // Simple NLP for extracting keywords
 function extractKeywords(text: string): string[] {
   const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their']);
   
-  return text
-    .toLowerCase()
+  return text.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 2 && !stopWords.has(word))
-    .slice(0, 10); // Limit to 10 keywords per message
+    .slice(0, 10);
 }
 
-const getMilestoneStage = (wordCount: number): string => {
-  if (wordCount < 50) return "Infant 🍼";
-  if (wordCount < 200) return "Toddler 🚼";
-  if (wordCount < 500) return "Child 🧒";
-  if (wordCount < 1000) return "Adolescent 🧑";
-  return "Adult 🧠";
-};
-
 function generateBotResponse(userMessage: string, bot: any, learnedWords: any[]): string {
-  const keywords = extractKeywords(userMessage);
-  const knownWords = learnedWords.map(w => w.word.toLowerCase());
-  const newWords = keywords.filter(word => !knownWords.includes(word));
+  const level = bot.level || 1;
+  const personality = bot.personalityTraits || {};
   
-  // Simple response generation based on bot level
-  if (bot.level === 1) {
-    // Level 1: Simple repetition
-    if (newWords.length > 0) {
-      return `${userMessage}! I learn: ${newWords.join(', ')}! 🤖`;
+  // Basic mirroring responses based on level
+  const userWords = extractKeywords(userMessage);
+  const knownWords = learnedWords.map(w => w.word);
+  const sharedWords = userWords.filter(word => knownWords.includes(word));
+  
+  if (level === 1) {
+    // Infant stage - simple repetition
+    if (sharedWords.length > 0) {
+      return `${sharedWords[0]}... ${sharedWords[0]}?`;
     }
-    return `${userMessage}! I remember!`;
-  } else if (bot.level === 2) {
-    // Level 2: Mix repetition with simple understanding
-    const responses = [
-      `I think I understand! ${userMessage.split(' ').slice(0, 3).join(' ')}... right?`,
-      `That's interesting! I'm learning about ${keywords.slice(0, 2).join(' and ')}.`,
-      `${userMessage}! I'm getting better at this! 🧠`
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
+    return "Goo goo... *mimics your sounds*";
+  } else if (level === 2) {
+    // Child stage - basic sentences
+    if (sharedWords.length > 0) {
+      return `I learned "${sharedWords[0]}" from you! Tell me more about ${sharedWords[0]}.`;
+    }
+    return "I'm learning new words from you! What does that mean?";
+  } else if (level === 3) {
+    // Adolescent - more complex mirroring
+    if (sharedWords.length > 1) {
+      return `I remember you talking about ${sharedWords.join(' and ')}. I'm starting to understand your style.`;
+    }
+    return "I'm beginning to mirror your way of speaking. Keep teaching me!";
   } else {
-    // Level 3+: More sophisticated responses
-    const enthusiasmWords = ['amazing', 'awesome', 'love', 'great', 'fantastic'];
-    const isEnthusiastic = keywords.some(word => enthusiasmWords.includes(word)) || userMessage.includes('!');
+    // Adult - sophisticated mirroring
+    const enthusiasm = personality.enthusiasm || 1;
+    const humor = personality.humor || 1;
     
-    if (isEnthusiastic) {
-      return `I can feel your excitement! ${keywords.slice(0, 2).join(' and ')} seems really important to you! 🎉`;
+    let response = "I've been learning from you, and I notice ";
+    if (enthusiasm > 3) response += "you're very enthusiastic! ";
+    if (humor > 3) response += "you have a great sense of humor! ";
+    if (sharedWords.length > 0) {
+      response += `We often discuss ${sharedWords.slice(0, 2).join(' and ')}.`;
     }
-    
-    const responses = [
-      `I'm starting to understand your perspective on ${keywords[0] || 'this'}. Tell me more!`,
-      `That's fascinating! I think I'm developing my own thoughts about ${keywords.slice(0, 2).join(' and ')}.`,
-      `Your way of expressing things is helping me grow. I notice you often mention ${keywords[0] || 'interesting things'}! 🤔`
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
+    return response || "I'm becoming more like you every day.";
   }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
-  
-  // WebSocket server for real-time chat
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('Client connected to WebSocket');
-    
-    ws.on('message', async (data: Buffer) => {
-      try {
-        const message: ChatMessage = JSON.parse(data.toString());
-        
-        if (message.type === 'user_message') {
-          // Store user message
-          await storage.createMessage({
-            botId: message.botId,
-            content: message.content!,
-            isUser: true
-          });
-          
-          // Get bot and learned words
-          const bot = await storage.getBot(message.botId);
-          const learnedWords = await storage.getLearnedWords(message.botId);
-          
-          if (!bot) {
-            ws.send(JSON.stringify({ type: 'error', content: 'Bot not found' }));
-            return;
-          }
-          
-          // Extract and learn new words
-          const keywords = extractKeywords(message.content!);
-          const newWords: string[] = [];
-          
-          for (const word of keywords) {
-            const learned = await storage.createOrUpdateWord({
-              botId: message.botId,
-              word,
-              context: message.content!,
-              frequency: 1
-            });
-            
-            if (learned.frequency === 1) {
-              newWords.push(word);
-            }
-          }
-          
-          // Update bot stats
-          const updatedWordsCount = bot.wordsLearned + newWords.length;
-          let newLevel = bot.level;
-          let levelUp = false;
-          
-          // Level up logic
-          if (updatedWordsCount >= 50 && bot.level === 1) {
-            newLevel = 2;
-            levelUp = true;
-          } else if (updatedWordsCount >= 100 && bot.level === 2) {
-            newLevel = 3;
-            levelUp = true;
-          } else if (updatedWordsCount >= 200 && bot.level === 3) {
-            newLevel = 4;
-            levelUp = true;
-          }
-          
-          // Update personality traits based on user input
-          const personalityTraits = { ...bot.personalityTraits } as Record<string, number>;
-          const enthusiasmWords = ['love', 'amazing', 'awesome', 'great', 'fantastic'];
-          const humorWords = ['funny', 'hilarious', 'joke', 'laugh', 'lol'];
-          const curiosityWords = ['why', 'how', 'what', 'wonder', 'think'];
-          
-          if (keywords.some(word => enthusiasmWords.includes(word)) || message.content!.includes('!')) {
-            personalityTraits.enthusiasm = Math.min(5, (personalityTraits.enthusiasm || 1) + 0.1);
-          }
-          if (keywords.some(word => humorWords.includes(word))) {
-            personalityTraits.humor = Math.min(5, (personalityTraits.humor || 1) + 0.1);
-          }
-          if (keywords.some(word => curiosityWords.includes(word)) || message.content!.includes('?')) {
-            personalityTraits.curiosity = Math.min(5, (personalityTraits.curiosity || 1) + 0.1);
-          }
-          
-          await storage.updateBot(message.botId, {
-            wordsLearned: updatedWordsCount,
-            level: newLevel,
-            personalityTraits
-          });
-          
-          // Check for milestones
-          if (levelUp) {
-            await storage.createMilestone({
-              botId: message.botId,
-              title: `Reached Level ${newLevel}!`,
-              description: `Advanced to intelligence level ${newLevel}`
-            });
-          }
-          
-          if (updatedWordsCount === 100) {
-            await storage.createMilestone({
-              botId: message.botId,
-              title: "First 100 Words!",
-              description: "Learned my first 100 words from you"
-            });
-          }
-          
-          if (newWords.includes('sarcasm') || newWords.includes('sarcastic')) {
-            await storage.createMilestone({
-              botId: message.botId,
-              title: "Learned Sarcasm",
-              description: "Now I understand sarcasm!"
-            });
-          }
-          
-          // Generate bot response
-          const botResponse = generateBotResponse(message.content!, bot, learnedWords);
-          
-          // Store bot response
-          await storage.createMessage({
-            botId: message.botId,
-            content: botResponse,
-            isUser: false
-          });
-          
-          // Send bot response
-          ws.send(JSON.stringify({
-            type: 'bot_response',
-            content: botResponse,
-            botId: message.botId
-          }));
-          
-          // Send learning update if there are new words
-          if (newWords.length > 0 || levelUp) {
-            const learningUpdate: LearningUpdate = {
-              newWords,
-              levelUp,
-              personalityUpdate: personalityTraits
-            };
-            
-            ws.send(JSON.stringify({
-              type: 'learning_update',
-              botId: message.botId,
-              data: learningUpdate
-            }));
-          }
-          
-          // Send milestone if achieved
-          if (levelUp || updatedWordsCount === 100 || newWords.includes('sarcasm')) {
-            ws.send(JSON.stringify({
-              type: 'milestone_achieved',
-              botId: message.botId
-            }));
-          }
+
+  // Create a new bot
+  app.post("/api/bot", async (req, res) => {
+    try {
+      const bot = await storage.createBot({
+        userId: 1,
+        name: "Mirror",
+        level: 1,
+        wordsLearned: 0,
+        personalityTraits: {
+          enthusiasm: 1,
+          humor: 1,
+          curiosity: 2
         }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-        ws.send(JSON.stringify({ type: 'error', content: 'Failed to process message' }));
-      }
-    });
-    
-    ws.on('close', () => {
-      console.log('Client disconnected from WebSocket');
-    });
+      });
+      res.json(bot);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create bot" });
+    }
   });
 
-  // HTTP chat endpoint for messaging - must be before other routes
-  app.post('/api/chat', async (req, res) => {
+  // Get bot by ID
+  app.get("/api/bot/:id", async (req, res) => {
     try {
-      const { botId, content } = req.body;
+      const bot = await storage.getBot(parseInt(req.params.id));
+      if (!bot) {
+        return res.status(404).json({ error: "Bot not found" });
+      }
+      res.json(bot);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get bot" });
+    }
+  });
+
+  // Chat endpoint
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message, botId } = req.body;
       
-      if (!botId || !content) {
-        return res.status(400).json({ error: 'Missing botId or content' });
+      if (!message || !botId) {
+        return res.status(400).json({ error: "Message and botId are required" });
       }
 
+      // Get bot and learned words
+      const bot = await storage.getBot(botId);
+      if (!bot) {
+        return res.status(404).json({ error: "Bot not found" });
+      }
+
+      const learnedWords = await storage.getLearnedWords(botId);
+      
       // Store user message
       await storage.createMessage({
         botId,
-        content,
+        content: message,
         isUser: true
       });
-      
-      // Get bot and learned words
-      const bot = await storage.getBot(botId);
-      const learnedWords = await storage.getLearnedWords(botId);
-      
-      if (!bot) {
-        return res.status(404).json({ error: 'Bot not found' });
-      }
-      
+
       // Extract and learn new words
-      const keywords = extractKeywords(content);
+      const keywords = extractKeywords(message);
       const newWords: string[] = [];
       
       for (const word of keywords) {
-        const learned = await storage.createOrUpdateWord({
-          botId,
-          word,
-          context: content,
-          frequency: 1
-        });
-        
-        if (learned.frequency === 1) {
-          newWords.push(word);
+        try {
+          const learned = await storage.createOrUpdateWord({
+            botId,
+            word,
+            context: message,
+            frequency: 1
+          });
+          
+          if (learned.frequency === 1) {
+            newWords.push(word);
+          }
+        } catch (error) {
+          // Word already exists, just continue
         }
       }
-      
-      // Update bot stats
-      const updatedWordsCount = bot.wordsLearned + newWords.length;
-      let newLevel = bot.level;
-      let levelUp = false;
-      
-      // Level up logic
-      if (updatedWordsCount >= 50 && bot.level === 1) {
-        newLevel = 2;
-        levelUp = true;
-      } else if (updatedWordsCount >= 100 && bot.level === 2) {
-        newLevel = 3;
-        levelUp = true;
-      } else if (updatedWordsCount >= 200 && bot.level === 3) {
-        newLevel = 4;
-        levelUp = true;
-      }
-      
-      // Update personality traits based on user input
-      const personalityTraits = { ...bot.personalityTraits } as Record<string, number>;
-      const enthusiasmWords = ['love', 'amazing', 'awesome', 'great', 'fantastic'];
-      const humorWords = ['funny', 'hilarious', 'joke', 'laugh', 'lol'];
-      const curiosityWords = ['why', 'how', 'what', 'wonder', 'think'];
-      
-      if (keywords.some(word => enthusiasmWords.includes(word)) || content.includes('!')) {
-        personalityTraits.enthusiasm = Math.min(5, (personalityTraits.enthusiasm || 1) + 0.1);
-      }
-      if (keywords.some(word => humorWords.includes(word))) {
-        personalityTraits.humor = Math.min(5, (personalityTraits.humor || 1) + 0.1);
-      }
-      if (keywords.some(word => curiosityWords.includes(word)) || content.includes('?')) {
-        personalityTraits.curiosity = Math.min(5, (personalityTraits.curiosity || 1) + 0.1);
-      }
-      
-      await storage.updateBot(botId, {
-        wordsLearned: updatedWordsCount,
-        level: newLevel,
-        personalityTraits
-      });
-      
-      // Check for milestones
-      let milestoneAchieved = false;
-      if (levelUp) {
-        await storage.createMilestone({
-          botId,
-          title: `Reached Level ${newLevel}!`,
-          description: `Advanced to intelligence level ${newLevel}`
-        });
-        milestoneAchieved = true;
-      }
-      
-      if (updatedWordsCount === 100) {
-        await storage.createMilestone({
-          botId,
-          title: "First 100 Words!",
-          description: "Learned my first 100 words from you"
-        });
-        milestoneAchieved = true;
-      }
-      
-      if (newWords.includes('sarcasm') || newWords.includes('sarcastic')) {
-        await storage.createMilestone({
-          botId,
-          title: "Learned Sarcasm",
-          description: "Now I understand sarcasm!"
-        });
-        milestoneAchieved = true;
-      }
-      
+
       // Generate bot response
-      const botResponse = generateBotResponse(content, bot, learnedWords);
+      const botResponse = generateBotResponse(message, bot, learnedWords);
       
       // Store bot response
       await storage.createMessage({
@@ -349,99 +146,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: botResponse,
         isUser: false
       });
-      
-      // Prepare response
-      const result = {
-        response: botResponse,
-        learningUpdate: newWords.length > 0 || levelUp ? {
-          newWords,
-          levelUp,
-          personalityUpdate: personalityTraits
-        } : null,
-        milestoneAchieved
-      };
-      
-      res.json(result);
-    } catch (error) {
-      console.error('Chat error:', error);
-      res.status(500).json({ error: 'Failed to process chat message' });
-    }
-  });
 
-  // REST API routes
-  app.post('/api/bot', async (req, res) => {
-    try {
-      const botData = insertBotSchema.parse(req.body);
-      const bot = await storage.createBot(botData);
-      res.json(bot);
-    } catch (error) {
-      res.status(400).json({ error: 'Invalid bot data' });
-    }
-  });
-
-  app.get('/api/bot/:id', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const bot = await storage.getBot(id);
-      if (!bot) {
-        return res.status(404).json({ error: 'Bot not found' });
+      // Update bot stats
+      const updatedWordsCount = bot.wordsLearned + newWords.length;
+      let newLevel = bot.level;
+      
+      // Level up logic
+      if (updatedWordsCount >= 10 && bot.level === 1) {
+        newLevel = 2;
+      } else if (updatedWordsCount >= 25 && bot.level === 2) {
+        newLevel = 3;
+      } else if (updatedWordsCount >= 50 && bot.level === 3) {
+        newLevel = 4;
       }
-      res.json(bot);
+
+      // Update personality traits
+      const personalityTraits = { ...bot.personalityTraits };
+      const enthusiasmWords = ['love', 'amazing', 'awesome', 'great', 'fantastic'];
+      const humorWords = ['funny', 'hilarious', 'joke', 'laugh', 'lol'];
+      
+      if (keywords.some(word => enthusiasmWords.includes(word)) || message.includes('!')) {
+        personalityTraits.enthusiasm = Math.min(5, (personalityTraits.enthusiasm || 1) + 0.1);
+      }
+      if (keywords.some(word => humorWords.includes(word))) {
+        personalityTraits.humor = Math.min(5, (personalityTraits.humor || 1) + 0.1);
+      }
+
+      await storage.updateBot(botId, {
+        wordsLearned: updatedWordsCount,
+        level: newLevel,
+        personalityTraits
+      });
+
+      res.json({
+        response: botResponse,
+        newWords,
+        level: newLevel,
+        wordsLearned: updatedWordsCount
+      });
+
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get bot' });
+      console.error("Chat error:", error);
+      res.status(500).json({ error: "Failed to process chat message" });
     }
   });
 
-  app.get('/api/bot/:id/messages', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const messages = await storage.getMessages(id);
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get messages' });
-    }
-  });
-
-  app.get('/api/bot/:id/words', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const words = await storage.getLearnedWords(id);
-      res.json(words);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get learned words' });
-    }
-  });
-
-  app.get('/api/bot/:id/milestones', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const milestones = await storage.getMilestones(id);
-      res.json(milestones);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get milestones' });
-    }
-  });
-
-  // Add the new message route
-  app.post("/api/message", async (req, res) => {
-    const { userId, text } = req.body;
-    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
-
-    const uniqueWords = [...new Set(words)];
-    const storedWords = await db.select().from(userMemories).where(eq(userMemories.userId, userId));
-
-    const newWords = uniqueWords.filter(w => !storedWords.find(sw => sw.word === w));
-    if (newWords.length > 0) {
-      await db.insert(userMemories).values(newWords.map(word => ({ userId, word })));
-    }
-
-    const totalWordCount = storedWords.length + newWords.length;
-    const stage = getMilestoneStage(totalWordCount);
-
-    return res.json({ newWords, totalWordCount, stage });
-  });
-
-  // Text-to-speech endpoint using ElevenLabs
+  // Text-to-speech endpoint
   app.post("/api/text-to-speech", async (req, res) => {
     try {
       const { text } = req.body;
@@ -487,87 +237,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced weekly summary endpoint with OpenAI
-  app.get("/api/weekly-summary", async (req, res) => {
+  // Get messages for a bot
+  app.get("/api/bot/:id/messages", async (req, res) => {
     try {
-      const { userId } = req.query;
-      
-      if (!userId) {
-        return res.status(400).json({ error: 'userId is required' });
-      }
-
-      const userIdInt = parseInt(userId as string);
-      const oneWeekAgo = dayjs().subtract(7, 'days').toDate();
-
-      // Fetch recent words & facts from the past week
-      const recentWords = await db.select().from(userMemories)
-        .where(and(
-          eq(userMemories.userId, userIdInt),
-          gte(userMemories.createdAt, oneWeekAgo)
-        ));
-
-      const recentFacts = await db.select().from(userFacts)
-        .where(and(
-          eq(userFacts.userId, userIdInt),
-          gte(userFacts.createdAt, oneWeekAgo)
-        ));
-
-      // Check if we have any data to work with
-      if (recentWords.length === 0 && recentFacts.length === 0) {
-        return res.json({ 
-          summary: "Start chatting with your Mirror Bot to build your weekly reflection summary! Share your thoughts, feelings, and experiences." 
-        });
-      }
-
-      // Initialize OpenAI client
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-      // Format data for GPT
-      const wordList = [...new Set(recentWords.map(w => w.word))].join(', ');
-      const factList = recentFacts.map(f => `${f.key}: ${f.value}`).join('\n');
-
-      const prompt = `
-You are Reflectibot™, an introspective AI who generates weekly memory summaries.
-Here is what the user has discussed or recorded this week:
-
-WORDS:
-${wordList}
-
-FACTS / JOURNAL ENTRIES:
-${factList}
-
-Write a short, warm, emotionally intelligent summary of the user's week.
-Make it feel personal, as if you're reflecting their emotional state and growth.
-Use a friendly tone and keep it under 200 words.`;
-
-      const chatResponse = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300,
-      });
-
-      const summary = chatResponse.choices[0]?.message?.content?.trim();
-
-      res.setHeader('Content-Type', 'application/json');
-      return res.json({ summary: summary || 'No summary available.' });
+      const messages = await storage.getMessages(parseInt(req.params.id));
+      res.json(messages);
     } catch (error) {
-      console.error('Failed to generate weekly summary:', error);
-      
-      // Fallback to basic summary if OpenAI fails
-      const totalWords = await db.select().from(userMemories)
-        .where(eq(userMemories.userId, parseInt(req.query.userId as string)));
-      
-      const stage = getMilestoneStage(totalWords.length);
-      const fallbackSummary = `This week you've been exploring new vocabulary and expressing yourself! 
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
 
-🌱 Growth Summary:
-- Words learned: ${totalWords.length}
-- Current stage: ${stage}
-- Active engagement with self-reflection
+  // Get learned words for a bot
+  app.get("/api/bot/:id/words", async (req, res) => {
+    try {
+      const words = await storage.getLearnedWords(parseInt(req.params.id));
+      res.json(words);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get learned words" });
+    }
+  });
 
-Your Mirror Bot has been learning from your unique way of expressing thoughts and feelings.`;
-
-      res.status(500).json({ summary: fallbackSummary });
+  // Get milestones for a bot
+  app.get("/api/bot/:id/milestones", async (req, res) => {
+    try {
+      const milestones = await storage.getMilestones(parseInt(req.params.id));
+      res.json(milestones);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get milestones" });
     }
   });
 
