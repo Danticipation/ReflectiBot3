@@ -14,6 +14,7 @@ import express from "express";
 import path from "path";
 import multer from "multer";
 import fs from "fs";
+import ffmpeg from "fluent-ffmpeg";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -386,38 +387,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const audioPath = req.file.path;
-      let finalAudioPath = audioPath;
       
-      // If the file is WebM, rename it to have a supported extension for Whisper
-      if (req.file.originalname?.endsWith('.webm') || req.file.mimetype === 'audio/webm') {
-        // Rename .webm to .ogg as Whisper supports OGG but not WebM
-        const oggPath = audioPath.replace(/\.[^/.]+$/, '.ogg');
-        fs.renameSync(audioPath, oggPath);
-        finalAudioPath = oggPath;
+      // Debug: Log the file information
+      console.log('Audio file info:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+      
+      // Create a proper file stream with the correct filename for Whisper
+      let fileName = 'audio.wav';
+      if (req.file.originalname?.includes('.mp4')) {
+        fileName = 'audio.mp4';
+      } else if (req.file.originalname?.includes('.mp3')) {
+        fileName = 'audio.mp3';
+      } else if (req.file.originalname?.includes('.webm')) {
+        fileName = 'audio.webm';
       }
       
+      const fileStream = fs.createReadStream(audioPath);
+      // Override the filename in the stream for Whisper API
+      (fileStream as any).path = fileName;
+      
       const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(finalAudioPath),
+        file: fileStream,
         model: 'whisper-1',
         language: 'en',
-        temperature: 0.2,
-        response_format: 'text'
+        temperature: 0.2
       });
 
       // Clean up uploaded file
-      fs.unlinkSync(finalAudioPath);
+      fs.unlinkSync(audioPath);
       
-      res.json({ text: transcription });
+      res.json({ text: transcription.text });
       
     } catch (error) {
       console.error('Transcription error:', error);
       // Clean up file on error too
       if (req.file?.path) {
         try {
-          const pathToClean = req.file.originalname?.endsWith('.webm') || req.file.mimetype === 'audio/webm' 
-            ? req.file.path.replace(/\.[^/.]+$/, '.ogg') 
-            : req.file.path;
-          fs.unlinkSync(pathToClean);
+          fs.unlinkSync(req.file.path);
         } catch (cleanupError) {
           console.error('File cleanup error:', cleanupError);
         }
