@@ -635,6 +635,70 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
     }
   });
 
+  // Whisper API transcription endpoint
+  app.post('/api/transcribe', async (req, res) => {
+    try {
+      // Set up multer for handling file uploads
+      const multer = (await import('multer')).default;
+      const upload = multer({ storage: multer.memoryStorage() });
+      
+      // Handle the file upload
+      upload.single('audio')(req, res, async (err: any) => {
+        if (err) {
+          return res.status(400).json({ error: 'File upload error' });
+        }
+
+        const file = req.file;
+        const userId = req.body.userId;
+
+        if (!file || !userId) {
+          return res.status(400).json({ error: 'Missing audio file or userId' });
+        }
+
+        try {
+          // Create a File object for OpenAI Whisper API
+          const audioFile = new File([file.buffer], 'recording.webm', {
+            type: file.mimetype
+          });
+
+          // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+          const transcription = await openai.audio.transcriptions.create({
+            file: audioFile,
+            model: 'whisper-1',
+            response_format: 'json',
+            language: 'en'
+          });
+
+          const transcribedText = transcription.text;
+
+          // Store transcription as memory
+          await storage.createUserMemory({
+            userId: parseInt(userId),
+            memory: transcribedText,
+            category: 'voice_input',
+            importance: 'medium'
+          });
+
+          res.json({ 
+            text: transcribedText,
+            success: true 
+          });
+
+        } catch (transcriptionError) {
+          console.error('Whisper transcription error:', transcriptionError);
+          res.status(500).json({ 
+            error: 'Transcription failed',
+            message: 'Could not process audio with Whisper API'
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error('Transcription endpoint error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Serve main interface
   app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
@@ -685,11 +749,21 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
                 <button 
                     id="voiceInputBtn" 
                     class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors relative"
-                    title="Click to speak"
+                    title="Click to speak (Web Speech API)"
                 >
                     <span id="voiceIcon">🎤</span>
                     <div id="voiceStatus" class="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-300 hidden">
                         Listening...
+                    </div>
+                </button>
+                <button 
+                    id="whisperBtn" 
+                    class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors relative"
+                    title="High-quality Whisper recording"
+                >
+                    <span id="whisperIcon">🔴</span>
+                    <div id="whisperStatus" class="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-300 hidden">
+                        Recording...
                     </div>
                 </button>
                 <button 
@@ -708,9 +782,10 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
                 </div>
                 <div id="speechStatus" class="text-gray-500">
                     <span id="isListening" class="hidden text-blue-400">🎤 Listening...</span>
+                    <span id="isRecording" class="hidden text-indigo-400">🔴 Recording...</span>
                     <span id="isSpeaking" class="hidden text-purple-400">🔊 Speaking...</span>
                 </div>
-                <span>Press Enter to send or click 🎤 to speak</span>
+                <span>Press Enter to send • 🎤 Quick voice • 🔴 High-quality recording</span>
             </div>
             
             <!-- Enhanced Memory Dashboard -->
@@ -953,12 +1028,21 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
             if (e.key === 'Enter') sendMessage();
         };
         
-        // Voice input button
+        // Voice input button (Web Speech API)
         document.getElementById('voiceInputBtn').onclick = () => {
             if (isListening) {
                 stopListening();
             } else {
                 startListening();
+            }
+        };
+        
+        // Whisper recording button
+        document.getElementById('whisperBtn').onclick = () => {
+            if (isRecording) {
+                stopWhisperRecording();
+            } else {
+                startWhisperRecording();
             }
         };
         
@@ -1107,6 +1191,11 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
         let isSpeaking = false;
         let lastBotResponse = '';
         
+        // Whisper recording setup
+        let mediaRecorder = null;
+        let isRecording = false;
+        let audioChunks = [];
+        
         function initializeVoiceRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
@@ -1227,6 +1316,80 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
             isSpeaking = false;
             document.getElementById('isSpeaking').classList.add('hidden');
             document.getElementById('speakBtn').classList.remove('animate-pulse');
+        }
+        
+        // Whisper recording functions
+        async function startWhisperRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await processWhisperAudio(audioBlob);
+                    
+                    // Stop all tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                document.getElementById('whisperIcon').textContent = '⏹️';
+                document.getElementById('whisperStatus').classList.remove('hidden');
+                document.getElementById('isRecording').classList.remove('hidden');
+                document.getElementById('whisperBtn').classList.add('animate-pulse');
+                
+            } catch (error) {
+                console.error('Whisper recording error:', error);
+                alert('Could not access microphone for recording');
+            }
+        }
+        
+        function stopWhisperRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('whisperIcon').textContent = '🔴';
+                document.getElementById('whisperStatus').classList.add('hidden');
+                document.getElementById('isRecording').classList.add('hidden');
+                document.getElementById('whisperBtn').classList.remove('animate-pulse');
+            }
+        }
+        
+        async function processWhisperAudio(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('userId', '1');
+                
+                const transcribeRes = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (transcribeRes.ok) {
+                    const transcribeData = await transcribeRes.json();
+                    document.getElementById('messageInput').value = transcribeData.text;
+                    
+                    // Automatically send the transcribed message
+                    sendMessage();
+                } else {
+                    console.error('Transcription failed');
+                    alert('Failed to transcribe audio. Please try again.');
+                }
+            } catch (error) {
+                console.error('Audio processing error:', error);
+                alert('Error processing audio recording');
+            }
         }
 
         // Load dashboard on startup

@@ -1,0 +1,92 @@
+// 📁 client/src/components/WhisperRecorder.tsx
+
+import { useState } from 'react';
+
+export default function WhisperRecorder() {
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const chunks: BlobPart[] = [];
+
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      setAudioUrl(URL.createObjectURL(blob));
+      const formData = new FormData();
+      formData.append('audio', blob);
+      formData.append('userId', 'user123');
+
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      console.log('Transcribed:', data.text);
+    };
+
+    recorder.start();
+    setMediaRecorder(recorder);
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    mediaRecorder?.stop();
+    setRecording(false);
+  };
+
+  return (
+    <div className="p-4 bg-gray-800 text-white rounded-xl">
+      <button
+        onClick={recording ? stopRecording : startRecording}
+        className={`px-4 py-2 rounded ${recording ? 'bg-red-500' : 'bg-green-500'}`}
+      >
+        {recording ? 'Stop Recording' : 'Start Whisper Recording'}
+      </button>
+      {audioUrl && (
+        <audio controls src={audioUrl} className="mt-4" />
+      )}
+    </div>
+  );
+}
+
+
+// 📁 server/routes/transcribe.ts
+
+import { Router } from 'express';
+import multer from 'multer';
+import { OpenAI } from 'openai';
+
+const router = Router();
+const upload = multer();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+router.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  const file = req.file;
+  const userId = req.body.userId;
+
+  if (!file || !userId) return res.status(400).json({ error: 'Missing audio or userId' });
+
+  const buffer = file.buffer;
+  const response = await openai.audio.transcriptions.create({
+    file: new Blob([buffer], { type: file.mimetype }),
+    model: 'whisper-1',
+    response_format: 'json'
+  });
+
+  const text = response.text;
+
+  // Optionally store as memory
+  await db.insert(userMemories).values({
+    userId,
+    memory: text,
+    type: 'thought'
+  });
+
+  res.json({ text });
+});
+
+export default router;
