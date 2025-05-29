@@ -1,0 +1,115 @@
+// --- App.tsx ---
+// Fully redesigned Reflectibot frontend layout
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import WhisperRecorder from './components/WhisperRecorder';
+import MemoryDashboard from './components/MemoryDashboard';
+
+interface BotStats {
+  level: number;
+  stage: string;
+  wordsLearned: number;
+}
+
+interface Message {
+  sender: 'user' | 'bot';
+  text: string;
+  time: string;
+}
+
+const App = () => {
+  const [botStats, setBotStats] = useState<BotStats | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/stats?userId=1')
+      .then(res => setBotStats(res.data))
+      .catch(() => setBotStats({ level: 1, stage: 'Infant', wordsLearned: 0 }));
+  }, []);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const newMessage: Message = {
+      sender: 'user',
+      text: input,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages(prev => [...prev, newMessage]);
+    setInput('');
+    setLoading(true);
+    try {
+      const res = await axios.post('/api/chat', { message: newMessage.text, userId: 1 });
+      setMessages(prev => [...prev, {
+        sender: 'bot',
+        text: res.data.response,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch (err) {
+      console.error('Chat failed', err);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white font-sans flex flex-col">
+      {/* Header */}
+      <div className="p-4 bg-gray-800 shadow flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">🪞 Mirror Bot</h1>
+          <p className="text-sm text-gray-300">AI companion that learns and speaks</p>
+        </div>
+        {botStats && (
+          <div className="text-right">
+            <p className="text-lg font-semibold">Level {botStats.level} • {botStats.stage}</p>
+            <p className="text-xs text-gray-400">{botStats.wordsLearned} words learned</p>
+          </div>
+        )}
+      </div>
+
+      {/* Chat History */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`rounded-lg p-3 max-w-[70%] ${msg.sender === 'user' ? 'bg-blue-600 text-right' : 'bg-gray-700'}`}>
+              <p className="text-sm">{msg.text}</p>
+              <p className="text-[10px] text-gray-400 mt-1">{msg.time}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Input & Actions */}
+      <div className="p-4 bg-gray-800 flex flex-col items-center gap-2">
+        <div className="w-full flex gap-2">
+          <input
+            type="text"
+            placeholder="Type your message..."
+            className="flex-1 p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading}
+            className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded disabled:opacity-50"
+          >
+            Send
+          </button>
+        </div>
+        <div className="flex gap-4 text-white">
+          <WhisperRecorder onTranscribe={(text) => setInput(text)} />
+          <MemoryDashboard />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
