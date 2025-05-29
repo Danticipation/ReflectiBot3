@@ -1,9 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface Message {
   id: number;
   content: string;
   isUser: boolean;
+  timestamp: Date;
+}
+
+interface BotStats {
+  level: number;
+  wordsLearned: number;
+  stage: string;
 }
 
 export default function App() {
@@ -11,7 +18,57 @@ export default function App() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [botStats, setBotStats] = useState<BotStats>({ level: 1, wordsLearned: 0, stage: 'Infant' });
+  const [showStats, setShowStats] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  // Initialize bot
+  useEffect(() => {
+    const initBot = async () => {
+      try {
+        const response = await fetch('/api/bot/1');
+        if (!response.ok) {
+          // Create new bot
+          await fetch('/api/bot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: 1,
+              name: 'Mirror',
+              level: 1,
+              wordsLearned: 0,
+              personalityTraits: { enthusiasm: 1, humor: 1, curiosity: 2 }
+            })
+          });
+        }
+      } catch (error) {
+        console.log('Bot initialization handled');
+      }
+    };
+    initBot();
+  }, []);
 
   const speakText = async (text: string) => {
     try {
@@ -38,8 +95,14 @@ export default function App() {
         setIsSpeaking(false);
       }
     } catch (error) {
-      console.error('Speech error:', error);
       setIsSpeaking(false);
+    }
+  };
+
+  const startVoiceInput = () => {
+    if (recognitionRef.current && !isListening) {
+      setIsListening(true);
+      recognitionRef.current.start();
     }
   };
 
@@ -49,7 +112,8 @@ export default function App() {
     const userMessage: Message = {
       id: Date.now(),
       content: input,
-      isUser: true
+      isUser: true,
+      timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -73,15 +137,21 @@ export default function App() {
         const botMessage: Message = {
           id: Date.now() + 1,
           content: data.response,
-          isUser: false
+          isUser: false,
+          timestamp: new Date()
         };
 
         setMessages(prev => [...prev, botMessage]);
         
+        // Update bot stats
+        setBotStats({
+          level: data.level,
+          wordsLearned: data.wordsLearned,
+          stage: data.level === 1 ? 'Infant' : data.level === 2 ? 'Child' : data.level === 3 ? 'Adolescent' : 'Adult'
+        });
+        
         // Speak the bot's response
         await speakText(data.response);
-      } else {
-        console.error('Chat request failed');
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -98,158 +168,133 @@ export default function App() {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #1f2937, #000)', 
-      color: 'white', 
-      padding: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 style={{ 
-            fontSize: '2.5rem', 
-            fontWeight: 'bold', 
-            color: '#10b981', 
-            marginBottom: '10px',
-            margin: '0 0 10px 0'
-          }}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+      <div className="container mx-auto max-w-4xl px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-emerald-400 mb-2 flex items-center justify-center gap-3">
             🪞 Mirror Bot
           </h1>
-          <p style={{ color: '#9ca3af', margin: '0' }}>
-            Your AI companion that learns and speaks
-          </p>
+          <p className="text-gray-400 text-lg">Your AI companion that learns and evolves</p>
+          <div className="flex justify-center gap-4 mt-4">
+            <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+              <span className="text-emerald-400 font-semibold">Level {botStats.level}</span>
+              <span className="text-gray-400 ml-2">• {botStats.stage}</span>
+            </div>
+            <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+              <span className="text-blue-400 font-semibold">{botStats.wordsLearned}</span>
+              <span className="text-gray-400 ml-1">words learned</span>
+            </div>
+          </div>
         </div>
 
-        <div style={{ 
-          background: '#374151', 
-          border: '1px solid #4b5563', 
-          borderRadius: '12px', 
-          padding: '20px', 
-          marginBottom: '20px', 
-          height: '400px', 
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {messages.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              color: '#6b7280', 
-              marginTop: '150px',
-              fontSize: '16px'
-            }}>
-              <p style={{ margin: '0 0 10px 0' }}>Start a conversation with your Mirror Bot!</p>
-              <p style={{ fontSize: '14px', margin: '0', opacity: '0.8' }}>
-                It will learn from you and speak its responses.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {messages.map((message) => (
+        {/* Chat Interface */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+          {/* Chat Area */}
+          <div className="h-96 overflow-y-auto p-6 space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-4">🤖</div>
+                <h3 className="text-xl font-semibold text-gray-300 mb-2">Welcome to Mirror Bot!</h3>
+                <p className="text-gray-500">Start a conversation and watch me learn from you.</p>
+                <p className="text-gray-500 text-sm mt-2">I'll speak my responses and adapt to your style.</p>
+              </div>
+            ) : (
+              messages.map((message) => (
                 <div
                   key={message.id}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: message.isUser ? 'flex-end' : 'flex-start'
-                  }}
+                  className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    style={{
-                      maxWidth: '75%',
-                      padding: '12px 16px',
-                      borderRadius: '16px',
-                      background: message.isUser ? '#10b981' : '#4b5563',
-                      color: 'white',
-                      fontSize: '15px',
-                      lineHeight: '1.4'
-                    }}
+                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                      message.isUser
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-100 border border-gray-600'
+                    }`}
                   >
-                    {message.content}
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                 </div>
-              ))}
-              {isLoading && (
-                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <div style={{ 
-                    background: '#4b5563', 
-                    color: '#9ca3af', 
-                    padding: '12px 16px', 
-                    borderRadius: '16px',
-                    fontSize: '15px'
-                  }}>
-                    Thinking...
+              ))
+            )}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-700 border border-gray-600 px-4 py-3 rounded-2xl">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-bounce w-2 h-2 bg-emerald-400 rounded-full"></div>
+                    <div className="animate-bounce w-2 h-2 bg-emerald-400 rounded-full" style={{animationDelay: '0.1s'}}></div>
+                    <div className="animate-bounce w-2 h-2 bg-emerald-400 rounded-full" style={{animationDelay: '0.2s'}}></div>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            style={{
-              flex: 1,
-              padding: '14px 16px',
-              background: '#374151',
-              border: '1px solid #4b5563',
-              borderRadius: '12px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              resize: 'none'
-            }}
-            disabled={isLoading}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={isLoading || !input.trim()}
-            style={{
-              padding: '14px 20px',
-              background: input.trim() && !isLoading ? '#10b981' : '#4b5563',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-              fontSize: '16px',
-              fontWeight: '500',
-              transition: 'background-color 0.2s'
-            }}
-          >
-            {isLoading ? '...' : 'Send'}
-          </button>
-        </div>
-
-        {isSpeaking && (
-          <div style={{ 
-            textAlign: 'center', 
-            marginTop: '20px',
-            padding: '10px',
-            background: 'rgba(16, 185, 129, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(16, 185, 129, 0.3)'
-          }}>
-            <p style={{ color: '#10b981', margin: '0', fontSize: '14px' }}>
-              🎤 Speaking...
-            </p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Input Area */}
+          <div className="border-t border-gray-700 p-4">
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your message or use voice input..."
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              {/* Voice Input Button */}
+              <button
+                onClick={startVoiceInput}
+                disabled={isLoading || isListening}
+                className={`px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                  isListening
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                🎤
+              </button>
+
+              {/* Send Button */}
+              <button
+                onClick={sendMessage}
+                disabled={isLoading || !input.trim()}
+                className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                  input.trim() && !isLoading
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-emerald-500/25'
+                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isLoading ? '•••' : 'Send'}
+              </button>
+            </div>
+
+            {/* Status Indicators */}
+            <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
+              <div className="flex gap-4">
+                {isListening && (
+                  <span className="text-red-400 animate-pulse">🎤 Listening...</span>
+                )}
+                {isSpeaking && (
+                  <span className="text-emerald-400">🔊 Speaking...</span>
+                )}
+              </div>
+              <span>Press Enter to send</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-gray-500 text-sm">
+          Mirror Bot v1.0 • Advanced AI Learning System with Voice Integration
+        </div>
 
         <audio ref={audioRef} style={{ display: 'none' }} />
-        
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '30px', 
-          fontSize: '12px', 
-          color: '#6b7280',
-          opacity: '0.7'
-        }}>
-          Mirror Bot v1.0 • Voice-enabled AI companion
-        </div>
       </div>
     </div>
   );
