@@ -60,9 +60,8 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Serve a working Mirror Bot interface
-  app.get("/mirror", (req, res) => {
-    res.send(`
+  // Remove the root route override to let Vite handle React app
+  // app.get("/", (req, res) => {
 <!DOCTYPE html>
 <html lang="en">
 <head>

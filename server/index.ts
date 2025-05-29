@@ -6,10 +6,12 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Fix MIME type for JavaScript modules
+// Ensure proper content types for modules
 app.use((req, res, next) => {
-  if (req.url.endsWith('.js') || req.url.endsWith('.tsx') || req.url.endsWith('.ts')) {
+  if (req.url.endsWith('.js')) {
     res.setHeader('Content-Type', 'application/javascript');
+  } else if (req.url.endsWith('.css')) {
+    res.setHeader('Content-Type', 'text/css');
   }
   next();
 });
