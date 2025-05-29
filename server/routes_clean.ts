@@ -388,8 +388,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const audioPath = req.file.path;
       
-      // Simple conversion to WAV using ffmpeg
-      const convertedPath = audioPath.replace(/\.[^/.]+$/, '.wav');
+      // Create a unique output path with .wav extension
+      const convertedPath = audioPath + '_converted.wav';
       
       await new Promise<void>((resolve, reject) => {
         ffmpeg(audioPath)
@@ -422,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.file?.path) {
         try {
           fs.unlinkSync(req.file.path);
-          const convertedPath = req.file.path.replace(/\.[^/.]+$/, '.wav');
+          const convertedPath = req.file.path + '_converted.wav';
           if (fs.existsSync(convertedPath)) {
             fs.unlinkSync(convertedPath);
           }
