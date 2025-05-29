@@ -72,6 +72,27 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Fetch bot statistics on load
+  useEffect(() => {
+    const fetchBotStats = async () => {
+      try {
+        const response = await fetch('/api/stats?userId=1');
+        if (response.ok) {
+          const data = await response.json();
+          setBotStats({
+            level: data.stage === 'Infant' ? 1 : data.stage === 'Toddler' ? 2 : data.stage === 'Child' ? 3 : data.stage === 'Adolescent' ? 4 : 5,
+            wordsLearned: data.wordCount,
+            stage: data.stage
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch bot stats:', error);
+      }
+    };
+
+    fetchBotStats();
+  }, []);
+
   const startListening = () => {
     if (recognitionRef.current && !isListening) {
       setIsListening(true);
