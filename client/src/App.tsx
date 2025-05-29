@@ -216,8 +216,24 @@ const AppComponent = () => {
           <div className="flex justify-between items-center">
             <div className="flex gap-3">
               <WhisperRecorder 
-                onTranscription={(text) => setInput(text)} 
-                onResponse={() => {}} 
+                onTranscription={(text) => {
+                  // Add voice input to chat history
+                  const userMessage: Message = {
+                    sender: 'user',
+                    text: text,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  };
+                  setMessages(prev => [...prev, userMessage]);
+                }} 
+                onResponse={(response) => {
+                  // Add bot response to chat history
+                  const botMessage: Message = {
+                    sender: 'bot',
+                    text: response,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  };
+                  setMessages(prev => [...prev, botMessage]);
+                }} 
               />
               <button 
                 onClick={() => setShowMemory(!showMemory)}

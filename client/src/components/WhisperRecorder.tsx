@@ -59,6 +59,8 @@ export default function WhisperRecorder({ onTranscription, onResponse }: Whisper
               if (onResponse) {
                 onResponse(chatData.response);
               }
+              
+
 
               // Play TTS response
               const ttsRes = await fetch('/api/text-to-speech', {
