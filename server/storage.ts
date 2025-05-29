@@ -163,7 +163,12 @@ export class DatabaseStorage implements IStorage {
   async createUserMemory(insertMemory: InsertUserMemory): Promise<UserMemory> {
     const [memory] = await db
       .insert(userMemories)
-      .values(insertMemory)
+      .values({
+        userId: insertMemory.userId,
+        memory: insertMemory.memory,
+        category: insertMemory.category,
+        importance: insertMemory.importance
+      })
       .returning();
     return memory;
   }
