@@ -544,6 +544,97 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
     }
   });
 
+  // Mood analysis endpoint for contextual UI theming
+  app.get('/api/mood-analysis', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      const memories = await storage.getUserMemories(userId);
+      const facts = await storage.getUserFacts(userId);
+      const bot = await storage.getBotByUserId(userId);
+
+      if (memories.length === 0) {
+        return res.json({
+          mood: 'neutral',
+          primaryColor: '#1f2937',
+          accentColor: '#10b981',
+          textColor: '#ffffff',
+          stage: bot ? getStageFromWordCount(bot.wordsLearned) : 'Infant'
+        });
+      }
+
+      // Get recent conversations for mood analysis
+      const recentMemories = memories.slice(-10);
+      const conversationText = recentMemories.map(m => m.memory).join('\n');
+      const currentStage = bot ? getStageFromWordCount(bot.wordsLearned) : 'Infant';
+
+      const prompt = `Analyze the emotional tone and mood from these user conversations and provide appropriate UI colors. Consider both the content and the developmental stage.
+
+Recent conversations:
+${conversationText}
+
+Current developmental stage: ${currentStage}
+
+Based on the emotional tone, conversational patterns, and developmental stage, provide:
+1. Primary mood (e.g., calm, excited, reflective, anxious, happy, contemplative)
+2. Primary background color (hex code)
+3. Accent color for highlights and buttons (hex code)
+4. Text color (hex code)
+
+Guidelines:
+- Calm/peaceful: Deep blues, soft grays
+- Excited/happy: Warm oranges, bright greens
+- Reflective/contemplative: Purple tones, muted colors
+- Anxious/stressed: Softer, muted tones
+- Early stages (Infant/Toddler): Warmer, gentler colors
+- Advanced stages (Adult): More sophisticated, deeper tones
+
+Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentColor": "#hex", "textColor": "#hex"}`;
+
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a mood and color analyst that provides JSON responses for UI theming based on conversation analysis."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 200,
+        temperature: 0.3
+      });
+
+      const moodData = JSON.parse(completion.choices[0].message.content || '{}');
+      
+      // Fallback to defaults if parsing fails
+      const response = {
+        mood: moodData.mood || 'neutral',
+        primaryColor: moodData.primaryColor || '#1f2937',
+        accentColor: moodData.accentColor || '#10b981',
+        textColor: moodData.textColor || '#ffffff',
+        stage: currentStage
+      };
+
+      res.json(response);
+
+    } catch (error) {
+      console.error('Error analyzing mood:', error);
+      res.json({
+        mood: 'neutral',
+        primaryColor: '#1f2937',
+        accentColor: '#10b981',
+        textColor: '#ffffff',
+        stage: 'Infant'
+      });
+    }
+  });
+
   // Serve main interface
   app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
@@ -558,12 +649,15 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
 <body class="bg-gray-900 text-white font-sans">
     <div id="app" class="min-h-screen flex flex-col">
         <!-- Header -->
-        <header class="bg-gray-800 p-4 border-b border-gray-700">
+        <header class="bg-gray-800 p-4 border-b border-gray-700" style="transition: all 1s ease-in-out;">
             <div class="max-w-4xl mx-auto flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-emerald-400">🧠 Reflectibot</h1>
-                <div id="stats" class="text-sm">
-                    <span id="stage" class="bg-emerald-600 px-2 py-1 rounded">Infant</span>
-                    <span id="wordCount" class="ml-2">Words: 0</span>
+                <div class="flex items-center gap-4">
+                    <h1 class="text-2xl font-bold text-emerald-400">🧠 Reflectibot</h1>
+                    <div id="moodIndicator" class="text-xs text-gray-400 italic">Analyzing mood...</div>
+                </div>
+                <div id="stats" class="text-sm flex items-center gap-3">
+                    <span id="stage" class="mood-accent px-2 py-1 rounded text-white font-medium">Infant</span>
+                    <span id="wordCount" class="text-gray-300">Words: 0</span>
                 </div>
             </div>
         </header>
@@ -845,7 +939,7 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
         // Auto-focus input
         document.getElementById('messageInput').focus();
         
-        // Enhanced memory dashboard functions
+        // Enhanced memory dashboard functions with mood-based theming
         async function loadMemoryDashboard() {
             try {
                 const statsResponse = await fetch('/api/stats?userId=1');
@@ -854,10 +948,70 @@ Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
                 const factsResponse = await fetch('/api/memory/list?userId=1&type=fact');
                 const factsData = await factsResponse.json();
                 
+                const moodResponse = await fetch('/api/mood-analysis?userId=1');
+                const moodData = await moodResponse.json();
+                
                 updateMemoryDashboard(statsData, factsData);
+                updateMoodTheming(moodData);
             } catch (error) {
                 console.error('Failed to load memory dashboard:', error);
             }
+        }
+        
+        function updateMoodTheming(moodData) {
+            const { mood, primaryColor, accentColor, textColor } = moodData;
+            
+            // Update CSS custom properties for dynamic theming
+            document.documentElement.style.setProperty('--mood-primary', primaryColor);
+            document.documentElement.style.setProperty('--mood-accent', accentColor);
+            document.documentElement.style.setProperty('--mood-text', textColor);
+            
+            // Update body background with smooth transition
+            document.body.style.background = \`linear-gradient(135deg, \${primaryColor} 0%, \${adjustColorBrightness(primaryColor, -20)} 100%)\`;
+            document.body.style.transition = 'background 2s ease-in-out';
+            
+            // Update header with mood indicator
+            const moodIndicator = document.getElementById('moodIndicator');
+            if (moodIndicator) {
+                moodIndicator.textContent = \`Current mood: \${mood}\`;
+                moodIndicator.style.color = accentColor;
+            }
+            
+            // Update accent elements
+            const accentElements = document.querySelectorAll('.mood-accent');
+            accentElements.forEach(el => {
+                el.style.backgroundColor = accentColor;
+                el.style.borderColor = accentColor;
+            });
+            
+            // Update cards with mood-aware styling
+            const cards = document.querySelectorAll('.bg-gray-800, .bg-gradient-to-br');
+            cards.forEach(card => {
+                card.style.backgroundColor = adjustColorBrightness(primaryColor, 10);
+                card.style.border = \`1px solid \${adjustColorBrightness(accentColor, -30)}\`;
+                card.style.transition = 'all 1s ease-in-out';
+            });
+        }
+        
+        function adjustColorBrightness(hex, percent) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+            
+            // Convert to RGB
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Adjust brightness
+            const newR = Math.max(0, Math.min(255, r + (r * percent / 100)));
+            const newG = Math.max(0, Math.min(255, g + (g * percent / 100)));
+            const newB = Math.max(0, Math.min(255, b + (b * percent / 100)));
+            
+            // Convert back to hex
+            return '#' + 
+                Math.round(newR).toString(16).padStart(2, '0') +
+                Math.round(newG).toString(16).padStart(2, '0') +
+                Math.round(newB).toString(16).padStart(2, '0');
         }
         
         function updateMemoryDashboard(stats, facts) {
