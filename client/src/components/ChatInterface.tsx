@@ -42,8 +42,10 @@ export function ChatInterface({
   });
   const [isListening, setIsListening] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -107,6 +109,9 @@ export function ChatInterface({
       setLocalMessages(prev => [...prev, userMessage, botResponse]);
       setInput('');
       
+      // Speak the bot's response
+      speakText(botResponse.content);
+      
       // Trigger learning update callback
       onLearningUpdate({
         newWords: data.newWords || [],
@@ -127,6 +132,34 @@ export function ChatInterface({
       recognitionRef.current.start();
     } else {
       alert('Voice recognition is not supported in this browser.');
+    }
+  };
+
+  const speakText = async (text: string) => {
+    try {
+      setIsSpeaking(true);
+      const response = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+
+      if (response.ok) {
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.onended = () => {
+            setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+          };
+          await audioRef.current.play();
+        }
+      }
+    } catch (error) {
+      console.error('Speech synthesis error:', error);
+      setIsSpeaking(false);
     }
   };
 
@@ -237,6 +270,7 @@ export function ChatInterface({
             📅
           </Button>
         </div>
+        <audio ref={audioRef} style={{ display: 'none' }} />
       </div>
 
       {showGrowth && (

@@ -9,6 +9,7 @@ import { insertBotSchema, insertMessageSchema, type ChatMessage, type LearningUp
 import { z } from "zod";
 import { OpenAI } from "openai";
 import dayjs from "dayjs";
+import { ElevenLabs } from "elevenlabs";
 
 // Simple NLP for extracting keywords
 function extractKeywords(text: string): string[] {
@@ -438,6 +439,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const stage = getMilestoneStage(totalWordCount);
 
     return res.json({ newWords, totalWordCount, stage });
+  });
+
+  // Text-to-speech endpoint using ElevenLabs
+  app.post("/api/text-to-speech", async (req, res) => {
+    try {
+      const { text } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+
+      const elevenLabs = new ElevenLabs({
+        apiKey: process.env.ELEVENLABS_API_KEY
+      });
+
+      // Use a natural-sounding voice (Rachel is a good default)
+      const audioStream = await elevenLabs.generate({
+        voice: "Rachel",
+        text: text,
+        model_id: "eleven_monolingual_v1"
+      });
+
+      // Convert stream to buffer
+      const chunks: Buffer[] = [];
+      for await (const chunk of audioStream) {
+        chunks.push(chunk);
+      }
+      const audioBuffer = Buffer.concat(chunks);
+
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length.toString(),
+      });
+
+      return res.send(audioBuffer);
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      res.status(500).json({ error: 'Failed to generate speech' });
+    }
   });
 
   // Enhanced weekly summary endpoint with OpenAI
