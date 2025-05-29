@@ -340,28 +340,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const audioPath = req.file.path;
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(audioPath));
-      formData.append('model', 'whisper-1');
-
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: formData
+      
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(audioPath),
+        model: 'whisper-1',
       });
 
-      if (!response.ok) {
-        throw new Error(`Whisper transcription failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
       // Clean up uploaded file
       fs.unlinkSync(audioPath);
       
-      res.json({ text: result.text });
+      res.json({ text: transcription.text });
       
     } catch (error) {
       console.error('Transcription error:', error);
@@ -377,17 +365,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced text-to-speech endpoint with dynamic voice selection
+  // Enhanced ElevenLabs text-to-speech endpoint with dynamic voice selection
   router.post('/api/text-to-speech', async (req, res) => {
     try {
       const { text, userId = 1 } = req.body;
-      
-      // Detect current mood and stage for voice selection
+
+      if (!text) {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+
+      // Detect current mood and stage for dynamic voice selection
       const bot = await storage.getBotByUserId(userId);
       const stage = bot ? getStageFromWordCount((await storage.getLearnedWords(bot.id)).length) : "Infant";
       
-      // Use browser TTS as fallback
-      res.json({ message: "Browser TTS should handle this client-side" });
+      // Use dynamic voice settings based on bot's developmental stage
+      const voiceSettings = getVoiceSettings("neutral", stage);
+      const voiceId = selectVoiceForMood("neutral", stage);
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': process.env.ELEVENLABS_API_KEY || '',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: voiceSettings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`ElevenLabs TTS failed: ${response.statusText}`);
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(Buffer.from(audioBuffer));
       
     } catch (error) {
       console.error('TTS error:', error);
