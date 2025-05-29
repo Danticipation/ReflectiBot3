@@ -36,16 +36,16 @@ export const voiceProfiles: VoiceProfile[] = [
 export function selectVoiceForMood(mood: string, stage: string): string {
   // Map mood to appropriate voice
   const moodToVoice: Record<string, string> = {
-    "excited": "Josh",
-    "happy": "Josh", 
-    "calm": "Rachel",
-    "peaceful": "Rachel",
-    "reflective": "Nicole",
-    "contemplative": "Nicole",
-    "anxious": "Rachel",
-    "stressed": "Rachel",
-    "professional": "Adam",
-    "neutral": "Rachel"
+    "excited": "v1IIiVAN4yJaGycxWmjU",
+    "happy": "v1IIiVAN4yJaGycxWmjU", 
+    "calm": "v1IIiVAN4yJaGycxWmjU",
+    "peaceful": "v1IIiVAN4yJaGycxWmjU",
+    "reflective": "v1IIiVAN4yJaGycxWmjU",
+    "contemplative": "v1IIiVAN4yJaGycxWmjU",
+    "anxious": "v1IIiVAN4yJaGycxWmjU",
+    "stressed": "v1IIiVAN4yJaGycxWmjU",
+    "professional": "v1IIiVAN4yJaGycxWmjU",
+    "neutral": "v1IIiVAN4yJaGycxWmjU"
   };
 
   // Adjust voice selection based on developmental stage
