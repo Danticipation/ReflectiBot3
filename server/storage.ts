@@ -30,6 +30,12 @@ export interface IStorage {
   // Milestone methods
   getMilestones(botId: number): Promise<Milestone[]>;
   createMilestone(milestone: InsertMilestone): Promise<Milestone>;
+
+  // Memory methods
+  getUserMemories(userId: number): Promise<UserMemory[]>;
+  createUserMemory(memory: InsertUserMemory): Promise<UserMemory>;
+  getUserFacts(userId: number): Promise<UserFact[]>;
+  createUserFact(fact: InsertUserFact): Promise<UserFact>;
 }
 
 export class DatabaseStorage implements IStorage {
