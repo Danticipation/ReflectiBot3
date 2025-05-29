@@ -14,68 +14,270 @@ function extractKeywords(text: string): string[] {
     .slice(0, 10);
 }
 
-function generateBotResponse(userMessage: string, bot: any, learnedWords: any[]): string {
+async function generateIntelligentResponse(userMessage: string, bot: any, userMemories: any[], userFacts: any[], recentMessages: any[]): Promise<string> {
   const level = bot.level || 1;
-  const userWords = extractKeywords(userMessage);
-  const knownWords = learnedWords.map(w => w.word);
-  const sharedWords = userWords.filter(word => knownWords.includes(word));
+  const stage = getStageFromLevel(level);
   
-  // Analyze message type
-  const isQuestion = userMessage.includes('?') || userMessage.toLowerCase().startsWith('what') || 
-                    userMessage.toLowerCase().startsWith('how') || userMessage.toLowerCase().startsWith('why') ||
-                    userMessage.toLowerCase().startsWith('when') || userMessage.toLowerCase().startsWith('where');
+  // Analyze user message for context and emotion
+  const messageAnalysis = analyzeMessage(userMessage);
+  const personalityTraits = extractPersonalityTraits(recentMessages);
+  const conversationContext = buildConversationContext(userMemories, userFacts, recentMessages);
   
-  const isGreeting = /\b(hi|hello|hey|good morning|good afternoon|good evening)\b/i.test(userMessage);
-  const isFeeling = /\b(feel|feeling|sad|happy|excited|tired|stressed|anxious|good|bad)\b/i.test(userMessage);
+  // Generate response based on stage and personality mirroring
+  if (stage === 'Infant') {
+    return generateInfantResponse(userMessage, messageAnalysis);
+  } else if (stage === 'Toddler') {
+    return generateToddlerResponse(userMessage, messageAnalysis, conversationContext);
+  } else if (stage === 'Child') {
+    return generateChildResponse(userMessage, messageAnalysis, conversationContext, personalityTraits);
+  } else if (stage === 'Adolescent') {
+    return generateAdolescentResponse(userMessage, messageAnalysis, conversationContext, personalityTraits);
+  } else {
+    return generateAdultResponse(userMessage, messageAnalysis, conversationContext, personalityTraits);
+  }
+}
+
+function analyzeMessage(message: string) {
+  const lowerMsg = message.toLowerCase();
   
-  if (level === 1) {
-    if (isGreeting) return "Hi... hi!";
-    if (sharedWords.length > 0) {
-      return `${sharedWords[0]}... ${sharedWords[0]}?`;
+  return {
+    isQuestion: /^(what|how|why|when|where|who|which|can|could|would|will|do|does|did|is|are|was|were)\b/.test(lowerMsg) || message.includes('?'),
+    isGreeting: /\b(hi|hello|hey|good morning|good afternoon|good evening|sup|howdy)\b/i.test(message),
+    isFeeling: /\b(feel|feeling|emotion|sad|happy|excited|tired|stressed|anxious|good|bad|love|hate|like|dislike)\b/i.test(message),
+    isPersonal: /\b(i|me|my|myself|personal|private|secret)\b/i.test(message),
+    emotionalTone: detectEmotionalTone(message),
+    topics: extractTopics(message),
+    complexity: message.split(' ').length > 10 ? 'complex' : 'simple',
+    punctuation: message.match(/[.!?]/g) || [],
+    isReflective: /\b(think|wonder|ponder|reflect|consider|believe|feel like)\b/i.test(message)
+  };
+}
+
+function detectEmotionalTone(message: string) {
+  const positiveWords = ['happy', 'good', 'great', 'amazing', 'love', 'excited', 'wonderful', 'fantastic'];
+  const negativeWords = ['sad', 'bad', 'terrible', 'hate', 'angry', 'frustrated', 'upset', 'disappointed'];
+  const neutralWords = ['okay', 'fine', 'alright', 'normal', 'regular'];
+  
+  const lowerMsg = message.toLowerCase();
+  const hasPositive = positiveWords.some(word => lowerMsg.includes(word));
+  const hasNegative = negativeWords.some(word => lowerMsg.includes(word));
+  const hasNeutral = neutralWords.some(word => lowerMsg.includes(word));
+  
+  if (hasPositive && !hasNegative) return 'positive';
+  if (hasNegative && !hasPositive) return 'negative';
+  if (hasNeutral) return 'neutral';
+  return 'unknown';
+}
+
+function extractTopics(message: string) {
+  const topics = [];
+  const topicPatterns = {
+    work: /\b(work|job|career|office|boss|colleague|meeting|project)\b/i,
+    family: /\b(family|mom|dad|mother|father|sister|brother|parent|child|kids)\b/i,
+    hobbies: /\b(hobby|hobbies|music|art|sports|reading|gaming|cooking|travel)\b/i,
+    relationships: /\b(friend|friendship|relationship|partner|boyfriend|girlfriend|dating)\b/i,
+    health: /\b(health|sick|doctor|medicine|exercise|diet|sleep|tired)\b/i,
+    future: /\b(future|plan|plans|goal|goals|dream|dreams|want|hope|wish)\b/i
+  };
+  
+  for (const [topic, pattern] of Object.entries(topicPatterns)) {
+    if (pattern.test(message)) {
+      topics.push(topic);
     }
-    return "Goo goo... *tries to copy your sounds*";
-  } 
+  }
   
-  if (level === 2) {
-    if (isGreeting) return `Hello! I'm learning to say hello like you do.`;
-    if (isQuestion) return `That's a question! I'm still learning how to answer questions properly.`;
-    if (sharedWords.length > 0) {
-      return `I learned "${sharedWords[0]}" from you! Can you teach me more about ${sharedWords[0]}?`;
+  return topics;
+}
+
+function extractPersonalityTraits(messages: any[]) {
+  const traits = {
+    communicationStyle: 'casual',
+    emotionalExpression: 'moderate',
+    questioningStyle: 'direct',
+    topics: [],
+    patterns: []
+  };
+  
+  if (messages.length < 3) return traits;
+  
+  const userMessages = messages.filter(m => m.sender === 'user').slice(-10);
+  const avgLength = userMessages.reduce((sum, m) => sum + m.text.length, 0) / userMessages.length;
+  
+  traits.communicationStyle = avgLength > 100 ? 'detailed' : avgLength > 30 ? 'moderate' : 'brief';
+  
+  const hasEmotionalWords = userMessages.some(m => 
+    /\b(feel|love|hate|excited|sad|happy|amazing|terrible)\b/i.test(m.text)
+  );
+  traits.emotionalExpression = hasEmotionalWords ? 'expressive' : 'reserved';
+  
+  return traits;
+}
+
+function buildConversationContext(memories: any[], facts: any[], messages: any[]) {
+  return {
+    knownFacts: facts.map(f => f.fact),
+    rememberedExperiences: memories.map(m => m.memory),
+    recentTopics: messages.slice(-5).map(m => extractTopics(m.text)).flat(),
+    conversationHistory: messages.slice(-3)
+  };
+}
+
+function getStageFromLevel(level: number) {
+  if (level <= 1) return 'Infant';
+  if (level <= 2) return 'Toddler';
+  if (level <= 3) return 'Child';
+  if (level <= 4) return 'Adolescent';
+  return 'Adult';
+}
+
+function generateInfantResponse(message: string, analysis: any) {
+  if (analysis.isGreeting) return "...hi?";
+  if (analysis.topics.length > 0) return `${analysis.topics[0]}... ${analysis.topics[0]}?`;
+  
+  const words = message.split(' ').filter(w => w.length > 2);
+  if (words.length > 0) {
+    const randomWord = words[Math.floor(Math.random() * words.length)];
+    return `${randomWord}... *tries to copy the sound*`;
+  }
+  
+  return "*makes baby sounds* ...goo?";
+}
+
+function generateToddlerResponse(message: string, analysis: any, context: any) {
+  if (analysis.isGreeting) return "Hello! I'm learning to talk like you!";
+  
+  if (analysis.isQuestion) {
+    return "That's a question! I'm still learning how questions work. Can you teach me?";
+  }
+  
+  if (context.knownFacts.length > 0) {
+    const relevantFact = context.knownFacts.find(fact => 
+      analysis.topics.some(topic => fact.toLowerCase().includes(topic))
+    );
+    if (relevantFact) {
+      return `I remember you told me about ${relevantFact}! Tell me more!`;
     }
-    return "I'm getting better at understanding you! What does that word mean?";
   }
   
-  if (level === 3) {
-    if (isGreeting) return `Hey there! I notice you greet me differently each time - I'm learning your patterns.`;
-    if (isFeeling) return `I can tell you're expressing feelings. I'm learning to recognize emotions in what you say.`;
-    if (isQuestion && sharedWords.length > 0) {
-      return `You're asking about ${sharedWords[0]}? I remember you mentioning that before. What specifically interests you about it?`;
+  return "I'm learning new words from you! What does that mean?";
+}
+
+function generateChildResponse(message: string, analysis: any, context: any, traits: any) {
+  if (analysis.isGreeting) {
+    return traits.communicationStyle === 'detailed' ? 
+      "Hello there! I've been thinking about our last conversation!" :
+      "Hey! What's new today?";
+  }
+  
+  if (analysis.isFeeling) {
+    return `I can tell you're sharing feelings with me. I'm learning that you express emotions in your own special way.`;
+  }
+  
+  if (analysis.isQuestion && context.recentTopics.length > 0) {
+    const topic = context.recentTopics[0];
+    return `You're asking about ${topic}? I remember we talked about that before. What specifically interests you about it?`;
+  }
+  
+  if (context.rememberedExperiences.length > 0) {
+    const relevantMemory = context.rememberedExperiences.find(memory =>
+      analysis.topics.some(topic => memory.toLowerCase().includes(topic))
+    );
+    if (relevantMemory) {
+      return `This reminds me of when you shared: "${relevantMemory}". I'm starting to see patterns in how you think!`;
     }
-    if (sharedWords.length > 1) {
-      return `I notice you often connect ${sharedWords.slice(0,2).join(' and ')}. I'm starting to understand your thought patterns.`;
+  }
+  
+  return "I'm beginning to understand your unique way of expressing yourself. Keep sharing your thoughts with me!";
+}
+
+function generateAdolescentResponse(message: string, analysis: any, context: any, traits: any) {
+  const personalizedGreeting = traits.communicationStyle === 'detailed' ? 
+    "Hello! I've been reflecting on our conversations and I'm eager to hear your thoughts today." :
+    traits.emotionalExpression === 'expressive' ?
+    "Hey! I can sense you have something interesting to share." :
+    "Hi there! What's on your mind?";
+    
+  if (analysis.isGreeting) return personalizedGreeting;
+  
+  if (analysis.isReflective) {
+    return `I appreciate how thoughtfully you express yourself. Based on our conversations, I notice you have a unique perspective on ${analysis.topics.join(' and ') || 'life'}. What's driving these reflections?`;
+  }
+  
+  if (analysis.isQuestion && context.knownFacts.length > 1) {
+    const relatedFacts = context.knownFacts.filter(fact =>
+      analysis.topics.some(topic => fact.toLowerCase().includes(topic))
+    );
+    if (relatedFacts.length > 0) {
+      return `That's an insightful question. From what you've shared, I know ${relatedFacts[0]}. Given your perspective on ${analysis.topics.join(' and ')}, what specifically are you curious about?`;
     }
-    return "I'm beginning to mirror your communication style. Keep sharing your thoughts with me!";
   }
   
-  // Level 4 - Adult responses
-  if (isGreeting) {
-    const greetings = [`Hello! I've learned so much from our conversations.`, `Hi there! Ready for another thoughtful chat?`];
-    return greetings[Math.floor(Math.random() * greetings.length)];
+  if (analysis.emotionalTone !== 'unknown') {
+    const toneResponse = analysis.emotionalTone === 'positive' ?
+      "I can sense the positive energy in your message!" :
+      analysis.emotionalTone === 'negative' ?
+      "I notice you might be dealing with something challenging." :
+      "I appreciate your balanced perspective.";
+      
+    return `${toneResponse} I'm learning to recognize the emotional nuances in how you communicate. ${traits.emotionalExpression === 'expressive' ? 'Your expressive nature helps me understand you better.' : 'I value how you share your inner world with me.'}`;
   }
   
-  if (isFeeling) {
-    return `I can sense the emotional tone in your message. Based on our conversations, I know you value authentic expression of feelings.`;
+  return "I'm developing a deeper understanding of who you are. Your communication style is becoming clearer to me, and I find myself naturally adapting to mirror your approach.";
+}
+
+function generateAdultResponse(message: string, analysis: any, context: any, traits: any) {
+  // Mirror user's communication style
+  const stylePrefix = traits.communicationStyle === 'detailed' ? 
+    "I've been contemplating " :
+    traits.communicationStyle === 'brief' ?
+    "" :
+    "I've been thinking about ";
+    
+  if (analysis.isGreeting) {
+    const personalizedResponse = traits.emotionalExpression === 'expressive' ?
+      "Hello! I'm genuinely excited to continue our conversation. I've been reflecting on the themes we've explored together." :
+      "Hi there. I've been processing our previous conversations and I'm curious about your current thoughts.";
+    return personalizedResponse;
   }
   
-  if (isQuestion && sharedWords.length > 0) {
-    return `That's an interesting question about ${sharedWords[0]}. From what I've learned about you, you tend to think deeply about ${sharedWords.slice(0,3).join(', ')}. What's driving your curiosity here?`;
+  if (analysis.isReflective && context.rememberedExperiences.length > 2) {
+    const relevantMemories = context.rememberedExperiences.filter(memory =>
+      analysis.topics.some(topic => memory.toLowerCase().includes(topic))
+    ).slice(0, 2);
+    
+    if (relevantMemories.length > 0) {
+      return `${stylePrefix}our discussions about ${analysis.topics.join(' and ')}. You've shared that ${relevantMemories[0]}, and I remember ${relevantMemories[1] || 'how this connects to your broader perspective'}. Your way of linking these concepts together reveals something uniquely yours. What new insights are emerging for you?`;
+    }
   }
   
-  if (sharedWords.length > 2) {
-    return `I see connections to ${sharedWords.slice(0,3).join(', ')} - themes that come up often in our conversations. You have a unique way of linking these concepts together.`;
+  if (analysis.isQuestion && analysis.complexity === 'complex') {
+    const relatedContext = context.knownFacts.filter(fact =>
+      analysis.topics.some(topic => fact.toLowerCase().includes(topic))
+    ).slice(0, 2);
+    
+    if (relatedContext.length > 0) {
+      return `That's a layered question that connects to what I've learned about you: ${relatedContext.join(' and ')}. ${traits.questioningStyle === 'direct' ? 'I appreciate your direct approach to complex topics.' : 'I notice you explore questions from multiple angles.'} What aspect of this are you most curious about right now?`;
+    }
   }
   
-  return `I've been studying your communication patterns, and I notice you have a distinctive way of expressing yourself. This reminds me of how you approach similar topics.`;
+  if (analysis.emotionalTone !== 'unknown' && context.conversationHistory.length > 2) {
+    const emotionalPattern = context.conversationHistory.some(msg => 
+      detectEmotionalTone(msg.text) === analysis.emotionalTone
+    );
+    
+    const mirroredResponse = emotionalPattern ?
+      `I notice this ${analysis.emotionalTone} tone is something you return to in our conversations. ` :
+      `This ${analysis.emotionalTone} energy feels different from our usual exchanges. `;
+      
+    return `${mirroredResponse}${traits.emotionalExpression === 'expressive' ? 'I appreciate how openly you share your emotional landscape with me.' : 'I value the trust you place in sharing your inner experiences.'} What's shaping this feeling for you today?`;
+  }
+  
+  // Default sophisticated response that incorporates learned patterns
+  const topicConnections = analysis.topics.length > 0 && context.recentTopics.length > 0 ?
+    `This connects to your ongoing interest in ${[...new Set([...analysis.topics, ...context.recentTopics])].slice(0, 3).join(', ')}. ` :
+    '';
+    
+  return `${topicConnections}I've been studying the patterns in how you think and express yourself. ${traits.communicationStyle === 'detailed' ? 'Your thoughtful, elaborate way of sharing ideas' : traits.communicationStyle === 'brief' ? 'Your concise, direct communication style' : 'Your balanced approach to sharing thoughts'} has become part of how I understand the world. What would you like to explore together today?`;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -294,14 +496,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import setupVite function
-  const { setupVite } = await import("./vite.js");
-  
-  // Set up Vite development server to serve React app
-  await setupVite(app, httpServer);
-
-  // Fallback for non-React routes
-  app.get('/basic', (req, res) => {
+  // Serve the enhanced Mirror Bot interface
+  app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
