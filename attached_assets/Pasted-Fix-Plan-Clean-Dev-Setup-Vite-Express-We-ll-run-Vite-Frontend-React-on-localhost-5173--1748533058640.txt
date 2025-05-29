@@ -1,0 +1,108 @@
+Fix Plan: Clean Dev Setup (Vite + Express)
+We’ll run:
+
+🧠 Vite: Frontend (React) on localhost:5173
+
+🧱 Express: Backend API on localhost:5000
+
+🔄 Proxy setup: Vite will forward all /api calls to Express
+
+🎯 Single command dev mode (via concurrently)
+
+📁 1. Folder Structure (Recommended)
+pgsql
+Copy
+Edit
+mirrorbot/
+├── client/           ← Vite + React frontend
+├── server/           ← Express + API routes
+├── package.json      ← Dev scripts / root deps
+🧪 2. Root package.json
+json
+Copy
+Edit
+{
+  "name": "mirrorbot",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm:start --prefix server\" \"npm:start --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  }
+}
+Install root dev dep:
+
+bash
+Copy
+Edit
+npm install concurrently --save-dev
+⚙️ 3. Vite Proxy Config (client/vite.config.ts)
+ts
+Copy
+Edit
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:5000'
+    }
+  }
+});
+🚀 4. Express Server (server/index.ts or .js)
+Serve only your API. Don’t serve frontend here.
+
+ts
+Copy
+Edit
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/test', (_req, res) => {
+  res.json({ message: 'It works!' });
+});
+
+const PORT = 5000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+🧼 5. React Frontend (client/src/App.tsx)
+tsx
+Copy
+Edit
+import { useEffect, useState } from 'react';
+
+function App() {
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/test')
+      .then(res => res.json())
+      .then(data => setMsg(data.message));
+  }, []);
+
+  return <h1>{msg}</h1>;
+}
+
+export default App;
+✅ Run it!
+From the project root:
+
+bash
+Copy
+Edit
+npm run dev
+React: http://localhost:5173
+
+Express API: http://localhost:5000
+
+Calls to /api/* on frontend go straight to the backend (no CORS issues, no MIME mismatches)
+
