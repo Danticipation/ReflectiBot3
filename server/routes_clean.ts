@@ -386,23 +386,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const audioPath = req.file.path;
+      let finalAudioPath = audioPath;
+      
+      // If the file is WebM, rename it to have a supported extension for Whisper
+      if (req.file.originalname?.endsWith('.webm') || req.file.mimetype === 'audio/webm') {
+        // Rename .webm to .ogg as Whisper supports OGG but not WebM
+        const oggPath = audioPath.replace(/\.[^/.]+$/, '.ogg');
+        fs.renameSync(audioPath, oggPath);
+        finalAudioPath = oggPath;
+      }
       
       const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(audioPath),
+        file: fs.createReadStream(finalAudioPath),
         model: 'whisper-1',
+        language: 'en',
+        temperature: 0.2,
+        response_format: 'text'
       });
 
       // Clean up uploaded file
-      fs.unlinkSync(audioPath);
+      fs.unlinkSync(finalAudioPath);
       
-      res.json({ text: transcription.text });
+      res.json({ text: transcription });
       
     } catch (error) {
       console.error('Transcription error:', error);
       // Clean up file on error too
       if (req.file?.path) {
         try {
-          fs.unlinkSync(req.file.path);
+          const pathToClean = req.file.originalname?.endsWith('.webm') || req.file.mimetype === 'audio/webm' 
+            ? req.file.path.replace(/\.[^/.]+$/, '.ogg') 
+            : req.file.path;
+          fs.unlinkSync(pathToClean);
         } catch (cleanupError) {
           console.error('File cleanup error:', cleanupError);
         }

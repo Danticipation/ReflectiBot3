@@ -14,9 +14,19 @@ export default function WhisperRecorder({ onTranscription, onResponse }: Whisper
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Try to use MP4 format first (supported by Whisper), then WebM
+      let mimeType = 'audio/webm';
+      let fileExtension = '.webm';
+      
+      if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+        fileExtension = '.mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
+        mimeType = 'audio/mpeg';
+        fileExtension = '.mp3';
+      }
+      
+      const recorder = new MediaRecorder(stream, { mimeType });
       const chunks: BlobPart[] = [];
 
       recorder.ondataavailable = (e) => {
@@ -28,12 +38,12 @@ export default function WhisperRecorder({ onTranscription, onResponse }: Whisper
       recorder.onstop = async () => {
         setProcessing(true);
         try {
-          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+          const audioBlob = new Blob(chunks, { type: mimeType });
           setAudioUrl(URL.createObjectURL(audioBlob));
           
           // Send to Whisper API for transcription
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
+          formData.append('audio', audioBlob, `recording${fileExtension}`);
           formData.append('userId', '1');
 
           const transcribeRes = await fetch('/api/transcribe', {
