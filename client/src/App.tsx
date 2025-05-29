@@ -240,7 +240,7 @@ const AppComponent = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="grid grid-cols-2 gap-2 mb-2">
             <button 
               onClick={() => setShowMemory(!showMemory)}
               className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
