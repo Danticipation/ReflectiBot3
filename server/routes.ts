@@ -115,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createMessage({
         botId,
         content: message,
-        sender: 'user'
+        isUser: true
       });
 
       // Generate bot response
@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createMessage({
         botId,
         content: response,
-        sender: 'bot'
+        isUser: false
       });
 
       // Update bot level based on words learned
@@ -146,9 +146,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create milestone
         await storage.createMilestone({
           botId,
-          type: `level_${newLevel}`,
-          description: `Reached level ${newLevel}`,
-          data: { level: newLevel, wordsLearned: totalWords }
+          title: `Level ${newLevel}`,
+          description: `Reached level ${newLevel}`
         });
       } else {
         await storage.updateBot(botId, { wordsLearned: totalWords });
@@ -176,13 +175,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
 
-      const { ElevenLabsApi } = await import("elevenlabs");
+      const { ElevenLabs } = await import("elevenlabs");
       
       if (!process.env.ELEVENLABS_API_KEY) {
         return res.status(500).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const elevenlabs = new ElevenLabsApi({
+      const elevenlabs = new ElevenLabs({
         apiKey: process.env.ELEVENLABS_API_KEY
       });
 
