@@ -28,7 +28,8 @@ export function ChatInterface({
   messages, 
   onToggleSidebar, 
   onLearningUpdate, 
-  onMilestoneAchieved 
+  onMilestoneAchieved,
+  onToggleSummary
 }: ChatInterfaceProps) {
   const [localMessages, setLocalMessages] = useState(messages);
   const [input, setInput] = useState('');
@@ -147,7 +148,9 @@ export function ChatInterface({
   };
 
   const toggleSummaryPanel = () => {
-    setShowSummary(!showSummary);
+    if (onToggleSummary) {
+      onToggleSummary();
+    }
   };
 
   const summaryQuery = useQuery({
