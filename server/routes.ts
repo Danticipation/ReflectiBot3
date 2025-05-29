@@ -10,6 +10,7 @@ import { analyzeMemoryImportance, type MemoryAnalysis } from "./memoryImportance
 import { extractTimeContext, generateTimeBasedContext, shouldPrioritizeMemory } from "./timestampLabeling.js";
 import { selectVoiceForMood, getVoiceSettings } from "./dynamicVoice.js";
 import { generateLoopbackSummary, formatSummaryForDisplay, type SummaryContext } from "./loopbackSummary.js";
+import { setupVite } from "./vite.js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -86,7 +87,7 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
     
     // Analyze conversation intent
     const conversationContext: ConversationContext = {
-      recentMessages: recentMessages.map(m => m.content),
+      recentMessages: recentMessages.map(m => m.text),
       userFacts: facts.map(f => f.fact),
       currentMood: "neutral",
       stage
@@ -106,7 +107,7 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
     // Build enhanced context for AI
     const memoryContext = memories.slice(-10).map(m => m.memory).join('\n');
     const factContext = facts.map(f => f.fact).join('\n');
-    const conversationHistoryContext = recentMessages.slice(-6).map(m => `${m.sender}: ${m.content}`).join('\n');
+    const conversationHistoryContext = recentMessages.slice(-6).map(m => `${m.sender}: ${m.text}`).join('\n');
     
     const systemPrompt = `You are Reflectibot, an AI companion in the "${stage}" learning stage. You learn and grow through conversations.
 
