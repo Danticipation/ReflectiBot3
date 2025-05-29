@@ -69,28 +69,40 @@ export function ChatInterface({
 
   const mutation = useMutation({
     mutationFn: async (text: string) => {
-      const response = await apiRequest('/api/message', {
+      const response = await fetch('/api/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 1, // replace with dynamic user id
+          userId: 1,
           text,
         })
       });
-      return response;
+      return await response.json();
     },
     onSuccess: (data) => {
       setGrowthStats({
-        wordsLearned: data.totalWordCount,
+        wordsLearned: data.totalWordCount || 0,
         factsRemembered: data.factsCount || 0,
-        stage: data.stage,
+        stage: data.stage || 'Infant 🍼',
       });
 
-      const response = {
-        text: `Reflectibot: I heard you say "${data.echoedText || input}"`,
-        sender: 'bot'
+      const userMessage = {
+        id: Date.now(),
+        botId: bot.id,
+        content: input,
+        isUser: true,
+        timestamp: new Date()
       };
-      setLocalMessages(prev => [...prev, { text: input, sender: 'user' }, response]);
+
+      const botResponse = {
+        id: Date.now() + 1,
+        botId: bot.id,
+        content: `I'm learning! You said: "${input}" - I now know ${data.totalWordCount || 0} words!`,
+        isUser: false,
+        timestamp: new Date()
+      };
+
+      setLocalMessages(prev => [...prev, userMessage, botResponse]);
       setInput('');
       
       // Trigger learning update callback
@@ -118,7 +130,14 @@ export function ChatInterface({
 
   const sendPrompt = () => {
     const prompt = journalingPrompts[Math.floor(Math.random() * journalingPrompts.length)];
-    setLocalMessages(prev => [...prev, { text: prompt, sender: 'bot' }]);
+    const botPrompt = {
+      id: Date.now(),
+      botId: bot.id,
+      content: prompt,
+      isUser: false,
+      timestamp: new Date()
+    };
+    setLocalMessages(prev => [...prev, botPrompt]);
     setShowPrompt(false);
   };
 
@@ -133,8 +152,9 @@ export function ChatInterface({
   const summaryQuery = useQuery({
     queryKey: ['weekly-summary'],
     queryFn: async () => {
-      const response = await apiRequest('/api/weekly-summary?userId=1');
-      return response.summary;
+      const response = await fetch('/api/weekly-summary?userId=1');
+      const data = await response.json();
+      return data.summary;
     },
     enabled: showSummary
   });
@@ -152,12 +172,12 @@ export function ChatInterface({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className={`mb-3 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
+            className={`mb-3 ${msg.isUser ? 'text-right' : 'text-left'}`}
           >
             <span className={`inline-block px-4 py-2 rounded-xl max-w-xs ${
-              msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'
+              msg.isUser ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'
             }`}>
-              {msg.text}
+              {msg.content}
             </span>
           </motion.div>
         ))}
