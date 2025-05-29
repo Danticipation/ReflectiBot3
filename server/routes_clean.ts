@@ -302,14 +302,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(router);
 
-  // Serve static files from the client build directory
-  const distPath = path.resolve(process.cwd(), "dist", "public");
-  app.use(express.static(distPath));
-
-  // Catch-all handler: send back React's index.html file for client-side routing
-  app.get("*", (req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
-  });
-
   return httpServer;
 }
