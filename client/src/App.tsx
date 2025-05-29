@@ -29,7 +29,9 @@ const AppComponent = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showMemoryDashboard, setShowMemoryDashboard] = useState(false);
+  const [weeklySummary, setWeeklySummary] = useState<string>('');
+  const [showReflection, setShowReflection] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 
@@ -43,6 +45,10 @@ const AppComponent = () => {
         });
       })
       .catch(() => setBotStats({ level: 1, stage: 'Infant', wordsLearned: 0 }));
+
+    axios.get('/api/weekly-summary?userId=1')
+      .then(res => setWeeklySummary(res.data.summary))
+      .catch(() => setWeeklySummary('No reflections available yet.'));
   }, []);
 
   const sendMessage = async () => {
@@ -214,10 +220,16 @@ const AppComponent = () => {
                 onResponse={() => {}} 
               />
               <button 
-                onClick={() => setShowMemoryDashboard(!showMemoryDashboard)}
+                onClick={() => setShowMemory(!showMemory)}
                 className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
               >
                 🧠 Memory
+              </button>
+              <button 
+                onClick={() => setShowReflection(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                📘 Reflection
               </button>
               <button 
                 onClick={() => setShowUserSwitch(!showUserSwitch)}
@@ -233,14 +245,34 @@ const AppComponent = () => {
         </div>
       </div>
 
-      {/* Memory Dashboard Modal */}
-      {showMemoryDashboard && (
+      {/* Weekly Reflection Modal */}
+      {showReflection && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-2xl w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-200">📘 Weekly Reflection</h3>
+              <button 
+                onClick={() => setShowReflection(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{weeklySummary}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Memory Dashboard */}
+      {showMemory && (
+        <div className="bg-slate-800/50 backdrop-blur-sm border-t border-slate-700/50 p-6">
+          <div className="max-w-6xl mx-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-200">Memory Dashboard</h3>
               <button 
-                onClick={() => setShowMemoryDashboard(false)}
+                onClick={() => setShowMemory(false)}
                 className="text-slate-400 hover:text-white"
               >
                 ✕
