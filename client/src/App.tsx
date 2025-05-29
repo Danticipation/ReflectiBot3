@@ -240,30 +240,24 @@ const AppComponent = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="flex gap-2 mb-2 justify-center">
             <button 
               onClick={() => setShowMemory(!showMemory)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
             >
               🧠 Memory
             </button>
             <button 
               onClick={() => setShowReflection(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
             >
               📘 Reflection
             </button>
             <button 
               onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-              className="bg-pink-600 hover:bg-pink-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
+              className="bg-pink-600 hover:bg-pink-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
             >
               🎙️ Voice
-            </button>
-            <button 
-              onClick={() => setShowUserSwitch(!showUserSwitch)}
-              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm"
-            >
-              👤 Switch User
             </button>
           </div>
           
