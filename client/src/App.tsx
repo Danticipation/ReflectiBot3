@@ -272,7 +272,7 @@ const AppComponent = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-2xl w-full">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-200">📘 Weekly Reflection</h3>
+              <h3 className="text-xl font-bold text-slate-200">🎙️ Voice Selection</h3>
               <button 
                 onClick={() => setShowReflection(false)}
                 className="text-slate-400 hover:text-white"
@@ -280,9 +280,12 @@ const AppComponent = () => {
                 ✕
               </button>
             </div>
-            <div className="bg-slate-900/50 rounded-lg p-4">
-              <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{weeklySummary}</p>
-            </div>
+            <VoiceSelector 
+              userId={1} 
+              onVoiceChange={(voice) => {
+                console.log('Voice changed to:', voice.name);
+              }}
+            />
           </div>
         </div>
       )}
