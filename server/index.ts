@@ -7,20 +7,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve static files from dist/public
-app.use(express.static(path.join(process.cwd(), 'dist/public')));
-
-// Set proper content types
-app.use((req, res, next) => {
-  if (req.url.endsWith('.js')) {
-    res.setHeader('Content-Type', 'application/javascript');
-  } else if (req.url.endsWith('.css')) {
-    res.setHeader('Content-Type', 'text/css');
-  } else if (req.url === '/' || !req.url.includes('.')) {
-    res.setHeader('Content-Type', 'text/html');
-  }
-  next();
-});
+// Remove static serving - let Vite handle frontend
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -63,9 +50,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Force production mode to serve built files
-  process.env.NODE_ENV = "production";
-  serveStatic(app);
+  // Setup Vite in development mode with proper proxy
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
