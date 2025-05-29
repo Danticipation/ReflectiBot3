@@ -239,25 +239,25 @@ const AppComponent = () => {
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 mb-2 justify-center">
+          {/* Control Buttons */}
+          <div className="flex gap-3 mb-2 justify-center flex-wrap">
             <button 
-              onClick={() => setShowMemory(!showMemory)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
+              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+              className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
             >
-              🧠 Memory
+              🎙️ Voice Options
             </button>
             <button 
               onClick={() => setShowReflection(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
             >
               📘 Reflection
             </button>
             <button 
               onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-              className="bg-pink-600 hover:bg-pink-700 text-white px-3 py-2 rounded-lg transition-all shadow-md text-sm flex-shrink-0"
+              className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
             >
-              🎙️ Voice
+              🎙️ Voice Settings
             </button>
           </div>
           
