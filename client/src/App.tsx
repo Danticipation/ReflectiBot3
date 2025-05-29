@@ -248,10 +248,10 @@ const AppComponent = () => {
               🎙️ Voice Options
             </button>
             <button 
-              onClick={() => setShowReflection(true)}
+              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
             >
-              📘 Reflection
+              🎙️ Voice Options
             </button>
             <button 
               onClick={() => setShowVoiceSelector(!showVoiceSelector)}
