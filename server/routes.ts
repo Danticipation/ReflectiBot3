@@ -43,8 +43,8 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Skip Vite setup for dual server configuration
-  // React app will run independently on port 5173
+  // Set up Vite development server for React app
+  await setupVite(app, httpServer);
 
   // Create a new bot
   app.post("/api/bot", async (req, res) => {
