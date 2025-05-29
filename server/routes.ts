@@ -2,6 +2,7 @@ import { createServer, type Server } from "http";
 import { Express } from "express";
 import { storage } from "./storage";
 import { z } from "zod";
+import path from "path";
 
 // Simple NLP for extracting keywords
 function extractKeywords(text: string): string[] {
@@ -58,6 +59,11 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+
+  // Serve the simple HTML version as the main route
+  app.get("/simple", (req, res) => {
+    res.sendFile(path.resolve(import.meta.dirname, "../client/public/index-simple.html"));
+  });
 
   // Create a new bot
   app.post("/api/bot", async (req, res) => {
