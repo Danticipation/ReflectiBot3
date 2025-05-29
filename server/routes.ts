@@ -60,6 +60,13 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
+  // Catch-all handler: send back React's index.html file for SPA routing
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(process.cwd(), 'dist/public', 'index.html'));
+    }
+  });
+
   // Create a new bot
   app.post("/api/bot", async (req, res) => {
     try {

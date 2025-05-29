@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -6,12 +7,17 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Ensure proper content types for modules
+// Serve static files from dist/public
+app.use(express.static(path.join(process.cwd(), 'dist/public')));
+
+// Set proper content types
 app.use((req, res, next) => {
   if (req.url.endsWith('.js')) {
     res.setHeader('Content-Type', 'application/javascript');
   } else if (req.url.endsWith('.css')) {
     res.setHeader('Content-Type', 'text/css');
+  } else if (req.url === '/' || !req.url.includes('.')) {
+    res.setHeader('Content-Type', 'text/html');
   }
   next();
 });
@@ -57,12 +63,9 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Setup Vite in development mode
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  // Force production mode to serve built files
+  process.env.NODE_ENV = "production";
+  serveStatic(app);
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
