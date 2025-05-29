@@ -241,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createUserFact({
           userId,
           fact,
-          source: 'conversation'
+          category: 'conversation'
         });
       }
 
@@ -249,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createUserMemory({
         userId,
         memory: message,
-        type: 'memory',
+        category: 'conversation',
         importance: 'medium'
       });
 
@@ -317,6 +317,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Stats error:', error);
       res.status(500).json({ error: 'Failed to get statistics' });
+    }
+  });
+
+  // User switching endpoint
+  router.post('/api/user/switch', async (req, res) => {
+    try {
+      const { name } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: 'Name is required' });
+      }
+
+      const userId = 1; // For now, we'll use the same userId but clear old data
+      
+      // Get counts before clearing
+      const existingMemories = await storage.getUserMemories(userId);
+      const existingFacts = await storage.getUserFacts(userId);
+      const memoryCount = existingMemories.length;
+      const factCount = existingFacts.length;
+      
+      // Clear existing data for clean switch
+      await storage.clearUserMemories(userId);
+      await storage.clearUserFacts(userId);
+      
+      // Store clean identity records
+      await storage.createUserFact({
+        userId,
+        fact: `User's name is ${name}`,
+        category: "identity"
+      });
+
+      await storage.createUserMemory({
+        userId,
+        memory: `Started conversation with ${name}`,
+        category: "identity_switch"
+      });
+
+      res.json({ 
+        message: `Successfully switched to user: ${name}`,
+        clearedMemories: memoryCount,
+        clearedFacts: factCount
+      });
+      
+    } catch (error) {
+      console.error('User switch error:', error);
+      res.status(500).json({ error: 'Failed to switch user' });
     }
   });
 

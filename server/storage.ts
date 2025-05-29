@@ -35,8 +35,10 @@ export interface IStorage {
   // Memory methods
   getUserMemories(userId: number): Promise<UserMemory[]>;
   createUserMemory(memory: InsertUserMemory): Promise<UserMemory>;
+  clearUserMemories(userId: number): Promise<void>;
   getUserFacts(userId: number): Promise<UserFact[]>;
   createUserFact(fact: InsertUserFact): Promise<UserFact>;
+  clearUserFacts(userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -183,6 +185,14 @@ export class DatabaseStorage implements IStorage {
       .values(insertFact)
       .returning();
     return fact;
+  }
+
+  async clearUserMemories(userId: number): Promise<void> {
+    await db.delete(userMemories).where(eq(userMemories.userId, userId));
+  }
+
+  async clearUserFacts(userId: number): Promise<void> {
+    await db.delete(userFacts).where(eq(userFacts.userId, userId));
   }
 }
 

@@ -45,6 +45,8 @@ function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [weeklySummary, setWeeklySummary] = useState<string>('');
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [showUserSwitch, setShowUserSwitch] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
