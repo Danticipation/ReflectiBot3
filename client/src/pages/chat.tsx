@@ -101,8 +101,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-3xl h-[80vh] flex flex-col border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
+    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 to-black text-white px-2 py-4">
+      <div className="w-full max-w-3xl mx-auto h-full flex flex-col border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
         <ChatInterface
           bot={bot}
           messages={messages}
@@ -113,18 +113,18 @@ export default function ChatPage() {
       </div>
 
       {isSidebarOpen && (
-        <div className="w-full max-w-3xl mt-6 p-4 bg-gray-800 rounded-xl shadow-lg text-left">
-          <h2 className="text-lg font-bold text-emerald-400 mb-2">Reflectibot Growth Dashboard</h2>
+        <div className="w-full max-w-3xl mx-auto mt-4 p-4 bg-gray-800 rounded-xl shadow text-left">
+          <h2 className="text-lg font-bold text-emerald-400 mb-2">Growth Dashboard</h2>
           <ul className="list-disc pl-6 space-y-1 text-sm text-gray-300">
             <li><strong>Words Learned:</strong> {learnedWords.length}</li>
             <li><strong>Facts Remembered:</strong> {milestones.length} personal entries</li>
             <li><strong>Current Stage:</strong> {bot.level === 1 ? 'Toddler 🍼' : bot.level === 2 ? 'Child 👶' : bot.level === 3 ? 'Adolescent 🧒' : 'Adult 🧑'}</li>
-            <li><strong>Next Milestone:</strong> Keep chatting to unlock new abilities! 🚀</li>
+            <li><strong>Next Milestone:</strong> Keep chatting to unlock new abilities</li>
           </ul>
         </div>
       )}
 
-      <div className="mt-6 text-sm text-gray-400">Reflectibot™ v1.0 — Your evolving AI twin.</div>
+      <div className="mt-4 text-xs text-gray-500 text-center">Reflectibot™ v1.0 — Built for mobile. Powered by memory.</div>
 
       <CelebrationModal
         isOpen={celebrationModal.isOpen}
