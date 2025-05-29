@@ -5,6 +5,11 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage.js";
 import OpenAI from "openai";
+import { detectIntent, generateResponseStrategy, type ConversationContext } from "./intentInference.js";
+import { analyzeMemoryImportance, type MemoryAnalysis } from "./memoryImportance.js";
+import { extractTimeContext, generateTimeBasedContext, shouldPrioritizeMemory } from "./timestampLabeling.js";
+import { selectVoiceForMood, getVoiceSettings } from "./dynamicVoice.js";
+import { generateLoopbackSummary, formatSummaryForDisplay, type SummaryContext } from "./loopbackSummary.js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -75,17 +80,46 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
     // Determine learning stage
     const stage = getStageFromWordCount(learnedWords.length);
     
-    // Build context for AI
+    // Extract time context for enhanced understanding
+    const timeContext = extractTimeContext(userMessage);
+    const timeBasedContext = generateTimeBasedContext(timeContext);
+    
+    // Analyze conversation intent
+    const conversationContext: ConversationContext = {
+      recentMessages: recentMessages.map(m => m.content),
+      userFacts: facts.map(f => f.fact),
+      currentMood: "neutral",
+      stage
+    };
+    
+    const intent = detectIntent(userMessage, conversationContext);
+    const responseStrategy = generateResponseStrategy(intent, conversationContext);
+    
+    // Analyze memory importance for storage prioritization
+    const memoryAnalysis = analyzeMemoryImportance(userMessage, {
+      isFirstMention: !facts.some(f => f.fact.toLowerCase().includes(userMessage.toLowerCase().split(' ')[0])),
+      containsPersonalInfo: /\b(my|i am|i work|i live|i like)\b/i.test(userMessage),
+      emotionalContext: intent.type,
+      userInitiated: true
+    });
+    
+    // Build enhanced context for AI
     const memoryContext = memories.slice(-10).map(m => m.memory).join('\n');
     const factContext = facts.map(f => f.fact).join('\n');
-    const conversationContext = recentMessages.slice(-6).map(m => `${m.sender}: ${m.text}`).join('\n');
+    const conversationHistoryContext = recentMessages.slice(-6).map(m => `${m.sender}: ${m.content}`).join('\n');
     
     const systemPrompt = `You are Reflectibot, an AI companion in the "${stage}" learning stage. You learn and grow through conversations.
+
+Context Analysis:
+- ${timeBasedContext}
+- Conversation Intent: ${intent.type} (confidence: ${intent.confidence})
+- Response Strategy: ${responseStrategy}
+- Memory Importance: ${memoryAnalysis.importance} - Tags: ${memoryAnalysis.tags.join(", ")}
 
 Your current knowledge:
 Facts about user: ${factContext || 'None yet'}
 Recent memories: ${memoryContext || 'None yet'}
-Recent conversation: ${conversationContext || 'This is the start'}
+Recent conversation: ${conversationHistoryContext || 'This is the start'}
 Words learned: ${learnedWords.length}
 
 Stage behaviors:
@@ -95,10 +129,10 @@ Stage behaviors:
 - Adolescent: Nuanced responses, emotional awareness
 - Adult: Sophisticated dialogue, deep connections to memories
 
-Respond as this stage would, referencing your stored knowledge naturally. Be authentic to your learning level.`;
+Respond naturally according to your developmental stage and the detected intent. Show emotional intelligence and contextual awareness based on the conversation analysis. Reference your stored knowledge appropriately.`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage }
