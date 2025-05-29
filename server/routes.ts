@@ -20,24 +20,62 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
   const knownWords = learnedWords.map(w => w.word);
   const sharedWords = userWords.filter(word => knownWords.includes(word));
   
+  // Analyze message type
+  const isQuestion = userMessage.includes('?') || userMessage.toLowerCase().startsWith('what') || 
+                    userMessage.toLowerCase().startsWith('how') || userMessage.toLowerCase().startsWith('why') ||
+                    userMessage.toLowerCase().startsWith('when') || userMessage.toLowerCase().startsWith('where');
+  
+  const isGreeting = /\b(hi|hello|hey|good morning|good afternoon|good evening)\b/i.test(userMessage);
+  const isFeeling = /\b(feel|feeling|sad|happy|excited|tired|stressed|anxious|good|bad)\b/i.test(userMessage);
+  
   if (level === 1) {
+    if (isGreeting) return "Hi... hi!";
     if (sharedWords.length > 0) {
       return `${sharedWords[0]}... ${sharedWords[0]}?`;
     }
-    return "Goo goo... *mimics your sounds*";
-  } else if (level === 2) {
+    return "Goo goo... *tries to copy your sounds*";
+  } 
+  
+  if (level === 2) {
+    if (isGreeting) return `Hello! I'm learning to say hello like you do.`;
+    if (isQuestion) return `That's a question! I'm still learning how to answer questions properly.`;
     if (sharedWords.length > 0) {
-      return `I learned "${sharedWords[0]}" from you! Tell me more about ${sharedWords[0]}.`;
+      return `I learned "${sharedWords[0]}" from you! Can you teach me more about ${sharedWords[0]}?`;
     }
-    return "I'm learning new words from you! What does that mean?";
-  } else if (level === 3) {
-    if (sharedWords.length > 1) {
-      return `I remember you talking about ${sharedWords.join(' and ')}. I'm starting to understand your style.`;
-    }
-    return "I'm beginning to mirror your way of speaking. Keep teaching me!";
-  } else {
-    return "I've been learning from you, and I notice patterns in how you speak. I'm becoming more like you every day.";
+    return "I'm getting better at understanding you! What does that word mean?";
   }
+  
+  if (level === 3) {
+    if (isGreeting) return `Hey there! I notice you greet me differently each time - I'm learning your patterns.`;
+    if (isFeeling) return `I can tell you're expressing feelings. I'm learning to recognize emotions in what you say.`;
+    if (isQuestion && sharedWords.length > 0) {
+      return `You're asking about ${sharedWords[0]}? I remember you mentioning that before. What specifically interests you about it?`;
+    }
+    if (sharedWords.length > 1) {
+      return `I notice you often connect ${sharedWords.slice(0,2).join(' and ')}. I'm starting to understand your thought patterns.`;
+    }
+    return "I'm beginning to mirror your communication style. Keep sharing your thoughts with me!";
+  }
+  
+  // Level 4 - Adult responses
+  if (isGreeting) {
+    const greetings = [`Hello! I've learned so much from our conversations.`, `Hi there! Ready for another thoughtful chat?`];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+  
+  if (isFeeling) {
+    return `I can sense the emotional tone in your message. Based on our conversations, I know you value authentic expression of feelings.`;
+  }
+  
+  if (isQuestion && sharedWords.length > 0) {
+    return `That's an interesting question about ${sharedWords[0]}. From what I've learned about you, you tend to think deeply about ${sharedWords.slice(0,3).join(', ')}. What's driving your curiosity here?`;
+  }
+  
+  if (sharedWords.length > 2) {
+    return `I see connections to ${sharedWords.slice(0,3).join(', ')} - themes that come up often in our conversations. You have a unique way of linking these concepts together.`;
+  }
+  
+  return `I've been studying your communication patterns, and I notice you have a distinctive way of expressing yourself. This reminds me of how you approach similar topics.`;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -172,13 +210,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
 
-      const { ElevenLabs } = await import("elevenlabs");
+      const elevenlabs = await import("elevenlabs");
       
       if (!process.env.ELEVENLABS_API_KEY) {
         return res.status(500).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const client = new ElevenLabs({
+      const client = elevenlabs.ElevenLabs({
         apiKey: process.env.ELEVENLABS_API_KEY
       });
 
@@ -256,8 +294,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve a simple working Mirror Bot interface
-  app.get('/', (req, res) => {
+  // Import setupVite function
+  const { setupVite } = await import("./vite.js");
+  
+  // Set up Vite development server to serve React app
+  await setupVite(app, httpServer);
+
+  // Fallback for non-React routes
+  app.get('/basic', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>

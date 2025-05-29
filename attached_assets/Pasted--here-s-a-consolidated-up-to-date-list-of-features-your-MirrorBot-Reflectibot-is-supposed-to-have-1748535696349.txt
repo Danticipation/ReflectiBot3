@@ -1,0 +1,101 @@
+ here’s a consolidated, up-to-date list of features your MirrorBot / Reflectibot is supposed to have — including what’s built, what’s in progress, and what’s planned.
+
+🧠 Core Concept
+MirrorBot (aka Reflectibot) is a deeply personal AI companion that starts with zero knowledge and learns exclusively from the user over time. It evolves through interaction — mirroring your speech, emotional tone, and identity.
+
+✅ Current / Confirmed Features
+1. Memory + Learning System
+🔁 Starts as an “infant” with no knowledge
+
+📈 Evolves through stages: Infant → Toddler → Child → Adolescent → Adult
+
+🧠 Persistent memory stored in PostgreSQL via Drizzle ORM
+
+🗣️ Learns user’s vocabulary, tone, facts, and quirks
+
+🧾 Summarization and reflection on past conversations
+
+🎓 Real-time learning acceleration to improve responsiveness
+
+2. Intelligent Conversation Engine
+💬 Natural, context-aware dialog
+
+📚 Pulls from stored memory and facts to respond
+
+🎭 Emotion detection with emotionally intelligent replies
+
+📌 Tracks topics and recent themes during chat
+
+❓Asks clarifying questions when confused (no wild guessing)
+
+🧵 Threaded context with short-term memory management
+
+3. Dual Personality Modes
+👤 Mirror Mode: Mimics your communication style
+
+🎭 Echo Mode: Surreal, experimental, creative (unlocks with maturity)
+
+4. Visual + Stats Dashboard
+📊 Vocabulary growth tracker
+
+🧩 Capability milestones and memory logs
+
+🧠 Learning stage indicator
+
+🔎 Admin control for viewing/editing memory if needed
+
+5. Voice Integration
+🔊 Text-to-Speech (TTS) using [ElevenLabs API]
+
+🗣️ Mobile-compatible voice playback
+
+🧬 Mode-specific voice profiles (calm, playful, robotic, etc.)
+
+6. UI + UX
+🖥️ Clean, mobile-first interface (React + Tailwind + shadcn/ui)
+
+⚡ Real-time WebSocket chat system
+
+🔁 Mode switching from UI
+
+🎨 Dark mode and mobile optimization
+
+🧘 Reflective/therapeutic vibe (for mental health applications)
+
+7. Backend Infrastructure
+🧠 LLM-powered backend (locally hosted or API-integrated)
+
+🌐 Express server with REST API
+
+🧾 Type-safe DB with Drizzle + PostgreSQL
+
+🔄 Real-time support via WebSockets
+
+🔐 Secure API routing (for user memory and TTS)
+
+🔧 Dev environment: Vite, TypeScript, TanStack Query
+
+🧪 In Progress or Upcoming
+📥 Voice Input (speech-to-text via Whisper or similar)
+
+🗂️ User Profiles (for multiple users or therapists managing clients)
+
+💖 Mental Health Toolkit (journaling prompts, breathing exercises, reflection questions)
+
+🔒 Secure API token storage (e.g., for ElevenLabs keys)
+
+🧠 Memory summarization on request (“What have you learned about me?”)
+
+🎯 Fine-tuned AI personas per user (casual, thoughtful, motivational)
+
+📲 Progressive Web App (PWA) deployment for mobile
+
+💡 Long-Term Vision
+🧬 Use in therapy, coaching, creative support
+
+🛠️ Exportable personalities and memories
+
+🧘 Integration with mood tracking and wellness platforms
+
+🤝 Used by both consumers and professionals
+
