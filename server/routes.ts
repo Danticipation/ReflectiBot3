@@ -19,6 +19,14 @@ function getStageFromWordCount(wordCount: number): string {
   return "Adult";
 }
 
+function getNextStageThreshold(wordCount: number): number {
+  if (wordCount < 10) return 10;
+  if (wordCount < 25) return 25;
+  if (wordCount < 50) return 50;
+  if (wordCount < 100) return 100;
+  return 1000;
+}
+
 // Extract meaningful words from text
 function extractKeywords(text: string): string[] {
   const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these', 'those']);
@@ -366,6 +374,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Messages get error:', error);
       res.status(500).json({ error: 'Failed to get messages' });
+    }
+  });
+
+  // Get memory statistics for dashboard
+  app.get('/api/stats', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      const memories = await storage.getUserMemories(userId);
+      const facts = await storage.getUserFacts(userId);
+      const bot = await storage.getBotByUserId(userId);
+      
+      const wordCount = bot ? bot.wordsLearned : 0;
+      const factCount = facts.length;
+      const memoryCount = memories.length;
+
+      const stage = getStageFromWordCount(wordCount);
+
+      res.json({ 
+        wordCount, 
+        factCount, 
+        memoryCount, 
+        stage,
+        nextStageAt: getNextStageThreshold(wordCount)
+      });
+    } catch (error) {
+      console.error('Error getting stats:', error);
+      res.status(500).json({ error: 'Failed to get stats' });
+    }
+  });
+
+  // Get memory list by type
+  app.get('/api/memory/list', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      const type = req.query.type as string | undefined;
+
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      if (type === 'fact') {
+        const facts = await storage.getUserFacts(userId);
+        res.json(facts.map(f => ({
+          id: f.id,
+          memory: f.fact,
+          type: 'fact',
+          createdAt: f.createdAt
+        })));
+      } else if (type === 'memory') {
+        const memories = await storage.getUserMemories(userId);
+        res.json(memories.map(m => ({
+          id: m.id,
+          memory: m.memory,
+          type: 'memory',
+          createdAt: m.createdAt
+        })));
+      } else {
+        const memories = await storage.getUserMemories(userId);
+        const facts = await storage.getUserFacts(userId);
+        const combined = [
+          ...memories.map(m => ({ id: m.id, memory: m.memory, type: 'memory', createdAt: m.createdAt })),
+          ...facts.map(f => ({ id: f.id, memory: f.fact, type: 'fact', createdAt: f.createdAt }))
+        ];
+        res.json(combined);
+      }
+    } catch (error) {
+      console.error('Error getting memory list:', error);
+      res.status(500).json({ error: 'Failed to get memory list' });
     }
   });
 

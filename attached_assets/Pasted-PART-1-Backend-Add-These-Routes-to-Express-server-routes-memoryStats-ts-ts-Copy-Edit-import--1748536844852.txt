@@ -1,0 +1,118 @@
+PART 1: Backend – Add These Routes to Express
+📁 server/routes/memoryStats.ts
+
+ts
+Copy
+Edit
+import { Router } from 'express';
+import { db } from '../db'; // Adjust path as needed
+import { userMemories } from '../schema';
+import { eq } from 'drizzle-orm';
+
+const router = Router();
+
+router.get('/api/stats', async (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  const allMemories = await db
+    .select()
+    .from(userMemories)
+    .where(eq(userMemories.userId, userId));
+
+  const wordCount = allMemories.reduce((acc, mem) => acc + mem.memory.split(' ').length, 0);
+  const factCount = allMemories.filter(mem => mem.type === 'fact').length;
+
+  const stage = wordCount < 50 ? 'Infant 🍼' :
+                wordCount < 200 ? 'Toddler 🚼' :
+                wordCount < 500 ? 'Child 👦' :
+                wordCount < 1000 ? 'Adolescent 👨‍🎓' : 'Adult 🧠';
+
+  res.json({ wordCount, factCount, stage });
+});
+
+router.get('/api/memory/list', async (req, res) => {
+  const userId = req.query.userId as string;
+  const type = req.query.type as string | undefined;
+
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  const query = db.select().from(userMemories).where(eq(userMemories.userId, userId));
+  const results = type ? (await query).filter(m => m.type === type) : await query;
+
+  res.json(results);
+});
+
+export default router;
+🔌 Add this route to your Express server:
+ts
+Copy
+Edit
+import memoryStatsRoutes from './routes/memoryStats';
+app.use(memoryStatsRoutes);
+🎨 PART 2: Frontend – Reflectibot Memory Dashboard (React + Tailwind)
+Add this new component to your frontend:
+
+📁 client/src/components/MemoryDashboard.tsx
+
+tsx
+Copy
+Edit
+import { useEffect, useState } from 'react';
+
+export default function MemoryDashboard() {
+  const [stats, setStats] = useState<{ wordCount: number; factCount: number; stage: string } | null>(null);
+  const [memories, setMemories] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const statsRes = await fetch('/api/stats?userId=user123');
+      const statsJson = await statsRes.json();
+      setStats(statsJson);
+
+      const memRes = await fetch('/api/memory/list?userId=user123&type=fact');
+      const memJson = await memRes.json();
+      setMemories(memJson);
+    };
+    fetchData();
+  }, []);
+
+  if (!stats) return <div className="text-gray-400">Loading memory stats...</div>;
+
+  return (
+    <div className="p-4 bg-gray-800 rounded-xl shadow-md text-white">
+      <h2 className="text-xl font-bold mb-2">🧠 Reflectibot Memory Dashboard</h2>
+      <ul className="mb-4">
+        <li><strong>Words Learned:</strong> {stats.wordCount}</li>
+        <li><strong>Facts Remembered:</strong> {stats.factCount}</li>
+        <li><strong>Current Stage:</strong> {stats.stage}</li>
+      </ul>
+      <h3 className="text-lg font-semibold mb-1">📌 Learned Facts:</h3>
+      <ul className="space-y-1 text-sm text-gray-300">
+        {memories.map((m, i) => (
+          <li key={i} className="border-b border-gray-700 pb-1">{m.memory}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+Use it in your main page:
+tsx
+Copy
+Edit
+import MemoryDashboard from './components/MemoryDashboard';
+
+function App() {
+  return (
+    <div>
+      {/* Your chat UI here */}
+      <MemoryDashboard />
+    </div>
+  );
+}
+✅ Recap: What This Adds
+Memory Growth Visualization ✅
+
+Stage Progression Tracker ✅
+
+Fact Memory Review UI ✅
