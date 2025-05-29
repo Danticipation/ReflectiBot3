@@ -734,9 +734,9 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
     }
   });
 
-  // Serve main interface
-  app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html>
+  // Remove static HTML route - React frontend will be served by Vite
+  // app.get('/', (req, res) => {
+  //   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1439,6 +1439,9 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
 </body>
 </html>`);
   });
+
+  // Setup Vite development server to serve React frontend
+  await setupVite(app, httpServer);
 
   return httpServer;
 }
