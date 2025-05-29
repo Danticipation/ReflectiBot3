@@ -1,4 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MemoryDashboard from './components/MemoryDashboard';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 interface Message {
   text: string;
@@ -171,11 +181,7 @@ function App() {
   const generateWeeklySummary = async () => {
     setSummaryLoading(true);
     try {
-      const response = await fetch('/api/weekly-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botId: 1 })
-      });
+      const response = await fetch('/api/weekly-summary?userId=1');
 
       if (response.ok) {
         const data = await response.json();
@@ -317,31 +323,12 @@ function App() {
         </div>
       </div>
 
-      {/* Growth Dashboard */}
+      {/* Enhanced Memory Dashboard */}
       {showGrowth && (
-        <div className="w-full max-w-4xl mt-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
-          <h3 className="text-lg font-bold text-emerald-400 mb-3">Growth Dashboard</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">{botStats.level}</div>
-              <div className="text-gray-400">Current Level</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">{botStats.wordsLearned}</div>
-              <div className="text-gray-400">Words Learned</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-400">{botStats.stage}</div>
-              <div className="text-gray-400">Development Stage</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">{messages.length}</div>
-              <div className="text-gray-400">Total Messages</div>
-            </div>
-          </div>
-          <div className="mt-4 text-xs text-gray-400">
-            <p>Next milestone: {botStats.wordsLearned < 10 ? '10 words for Child stage' : botStats.wordsLearned < 25 ? '25 words for Adolescent stage' : botStats.wordsLearned < 50 ? '50 words for Adult stage' : 'Maximum development reached'}</p>
-          </div>
+        <div className="w-full max-w-4xl mt-4">
+          <QueryClientProvider client={queryClient}>
+            <MemoryDashboard userId={1} />
+          </QueryClientProvider>
         </div>
       )}
 

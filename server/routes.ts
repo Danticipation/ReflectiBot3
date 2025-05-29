@@ -445,6 +445,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Weekly reflection summary endpoint
+  app.get('/api/weekly-summary', async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      // Get recent memories and facts (last 7 days)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      const memories = await storage.getUserMemories(userId);
+      const facts = await storage.getUserFacts(userId);
+      const bot = await storage.getBotByUserId(userId);
+
+      // Filter recent data
+      const recentMemories = memories.filter(m => new Date(m.createdAt) >= oneWeekAgo);
+      const recentFacts = facts.filter(f => new Date(f.createdAt) >= oneWeekAgo);
+
+      if (recentMemories.length === 0 && recentFacts.length === 0) {
+        return res.json({
+          summary: "You haven't shared much with me this week yet. I'm here whenever you want to talk about your thoughts, experiences, or anything on your mind.",
+          insights: [],
+          growthMetrics: {
+            newMemories: 0,
+            newFacts: 0,
+            currentStage: bot ? getStageFromWordCount(bot.wordsLearned) : 'Infant'
+          }
+        });
+      }
+
+      // Prepare context for AI summary
+      const conversationContext = recentMemories.map(m => m.memory).join('\n');
+      const personalFacts = recentFacts.map(f => f.fact).join('\n');
+      
+      const prompt = `As Reflectibot, an empathetic AI companion that learns and grows with users, please provide a warm, insightful weekly reflection based on our recent conversations.
+
+Recent conversations:
+${conversationContext}
+
+New things I learned about you:
+${personalFacts}
+
+Please provide:
+1. A compassionate summary of key themes and patterns from this week
+2. Insights about your growth, challenges, or recurring topics
+3. Encouraging observations about positive changes or strengths I notice
+4. Gentle questions or reflections that might help you think deeper
+
+Keep the tone warm, supportive, and personal - like a caring friend who has been listening carefully. Avoid being clinical or overly analytical. Focus on the human experience and emotional journey.
+
+Response format: A flowing, conversational reflection (2-3 paragraphs max).`;
+
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are Reflectibot, a compassionate AI companion that provides thoughtful, empathetic weekly reflections. Your tone is warm, supportive, and personally engaging."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      });
+
+      const summary = completion.choices[0].message.content;
+
+      // Generate simple insights
+      const insights = [];
+      if (recentMemories.length > 5) {
+        insights.push("You've been quite reflective this week - I love our deep conversations!");
+      }
+      if (recentFacts.length > 3) {
+        insights.push("I'm learning so much about who you are. Thank you for sharing!");
+      }
+
+      res.json({
+        summary,
+        insights,
+        growthMetrics: {
+          newMemories: recentMemories.length,
+          newFacts: recentFacts.length,
+          totalMemories: memories.length,
+          totalFacts: facts.length,
+          currentStage: bot ? getStageFromWordCount(bot.wordsLearned) : 'Infant',
+          wordsLearned: bot ? bot.wordsLearned : 0
+        }
+      });
+
+    } catch (error) {
+      console.error('Error generating weekly summary:', error);
+      res.status(500).json({ error: 'Failed to generate weekly summary' });
+    }
+  });
+
   // Serve main interface
   app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
