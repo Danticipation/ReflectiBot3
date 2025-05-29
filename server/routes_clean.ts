@@ -387,25 +387,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const audioPath = req.file.path;
+      
+      // Simple conversion to WAV using ffmpeg
       const convertedPath = audioPath.replace(/\.[^/.]+$/, '.wav');
       
-      // Convert audio to WAV format using ffmpeg
       await new Promise<void>((resolve, reject) => {
         ffmpeg(audioPath)
           .toFormat('wav')
-          .audioCodec('pcm_s16le')
-          .audioChannels(1)
-          .audioFrequency(16000)
           .save(convertedPath)
-          .on('end', () => resolve())
-          .on('error', (err) => reject(err));
+          .on('end', () => {
+            console.log('Audio conversion completed');
+            resolve();
+          })
+          .on('error', (err) => {
+            console.log('FFmpeg conversion error:', err);
+            reject(err);
+          });
       });
       
       const transcription = await openai.audio.transcriptions.create({
         file: fs.createReadStream(convertedPath),
-        model: 'whisper-1',
-        language: 'en',
-        temperature: 0.2
+        model: 'whisper-1'
       });
 
       // Clean up both files
