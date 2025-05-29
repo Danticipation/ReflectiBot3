@@ -20,6 +20,7 @@ interface ChatInterfaceProps {
   onToggleSidebar: () => void;
   onLearningUpdate: (update: LearningUpdate) => void;
   onMilestoneAchieved: () => void;
+  onToggleSummary?: () => void;
 }
 
 export function ChatInterface({ 
@@ -255,14 +256,7 @@ export function ChatInterface({
         </div>
       )}
 
-      {showSummary && (
-        <div className="w-full max-w-3xl mt-4 p-4 bg-gray-900 border border-gray-700 rounded-xl shadow text-left">
-          <h3 className="text-lg text-emerald-400 mb-2">🧾 Your Weekly Reflection</h3>
-          <p className="text-sm text-gray-300 whitespace-pre-line">
-            {summaryQuery.isLoading ? 'Generating your weekly summary...' : summaryQuery.data || 'No summary available yet.'}
-          </p>
-        </div>
-      )}
+
     </>
   );
 }

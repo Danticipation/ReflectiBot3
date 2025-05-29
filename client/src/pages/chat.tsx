@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 export default function ChatPage() {
   const [botId] = useState(1); // For demo, using bot ID 1
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [celebrationModal, setCelebrationModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -40,6 +41,17 @@ export default function ChatPage() {
   const { data: learnedWords = [], refetch: refetchWords } = useQuery<LearnedWord[]>({
     queryKey: [`/api/bot/${botId}/words`],
     enabled: !!bot,
+  });
+
+  // Weekly summary query
+  const { data: weeklySummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['weekly-summary'],
+    queryFn: async () => {
+      const response = await fetch('/api/weekly-summary?userId=1');
+      const data = await response.json();
+      return data.summary;
+    },
+    enabled: showSummary
   });
 
   // Create bot if it doesn't exist
@@ -109,6 +121,7 @@ export default function ChatPage() {
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onLearningUpdate={handleLearningUpdate}
           onMilestoneAchieved={handleMilestoneAchieved}
+          onToggleSummary={() => setShowSummary(!showSummary)}
         />
       </div>
 
@@ -121,6 +134,15 @@ export default function ChatPage() {
             <li><strong>Current Stage:</strong> {bot.level === 1 ? 'Toddler 🍼' : bot.level === 2 ? 'Child 👶' : bot.level === 3 ? 'Adolescent 🧒' : 'Adult 🧑'}</li>
             <li><strong>Next Milestone:</strong> Keep chatting to unlock new abilities</li>
           </ul>
+        </div>
+      )}
+
+      {showSummary && (
+        <div className="w-full max-w-3xl mx-auto mt-4 p-4 bg-gray-900 border border-gray-700 rounded-xl shadow text-left">
+          <h3 className="text-lg text-emerald-400 mb-2">🧾 Your Weekly Reflection</h3>
+          <p className="text-sm text-gray-300 whitespace-pre-line">
+            {summaryLoading ? 'Generating your weekly summary...' : weeklySummary || 'No summary available yet.'}
+          </p>
         </div>
       )}
 
