@@ -60,7 +60,233 @@ function generateBotResponse(userMessage: string, bot: any, learnedWords: any[])
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Remove frontend serving - let Vite handle this
+  // Serve React app directly since Vite dev server isn't running
+  app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror Bot</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function MirrorBot() {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [growthStats, setGrowthStats] = useState({ wordsLearned: 0, stage: 'Infant 🍼' });
+            const [isLoading, setIsLoading] = useState(false);
+            const [isListening, setIsListening] = useState(false);
+            const [isSpeaking, setIsSpeaking] = useState(false);
+            const [showGrowth, setShowGrowth] = useState(false);
+            const audioRef = useRef();
+            const recognitionRef = useRef();
+
+            useEffect(() => {
+                if ('webkitSpeechRecognition' in window) {
+                    recognitionRef.current = new webkitSpeechRecognition();
+                    recognitionRef.current.continuous = false;
+                    recognitionRef.current.onresult = (event) => {
+                        setInput(event.results[0][0].transcript);
+                        setIsListening(false);
+                    };
+                    recognitionRef.current.onend = () => setIsListening(false);
+                }
+
+                // Initialize bot
+                fetch('/api/bot/1').catch(() => {
+                    fetch('/api/bot', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: 1, name: 'Mirror', level: 1, wordsLearned: 0,
+                            personalityTraits: { enthusiasm: 1, humor: 1, curiosity: 2 }
+                        })
+                    });
+                });
+            }, []);
+
+            const handleVoiceInput = () => {
+                if (recognitionRef.current) {
+                    setIsListening(true);
+                    recognitionRef.current.start();
+                }
+            };
+
+            const speakText = async (text) => {
+                try {
+                    setIsSpeaking(true);
+                    const response = await fetch('/api/text-to-speech', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+                    if (response.ok) {
+                        const audioBlob = await response.blob();
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        audioRef.current.src = audioUrl;
+                        audioRef.current.onended = () => {
+                            setIsSpeaking(false);
+                            URL.revokeObjectURL(audioUrl);
+                        };
+                        await audioRef.current.play();
+                    } else {
+                        setIsSpeaking(false);
+                    }
+                } catch (error) {
+                    setIsSpeaking(false);
+                }
+            };
+
+            const sendMessage = async () => {
+                if (!input.trim() || isLoading) return;
+                
+                const userMessage = { text: input, sender: 'user' };
+                setMessages(prev => [...prev, userMessage]);
+                setInput('');
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMessage.text, botId: 1 })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        setGrowthStats({
+                            wordsLearned: data.wordsLearned || 0,
+                            stage: data.level === 1 ? 'Infant 🍼' : data.level === 2 ? 'Child 👶' : data.level === 3 ? 'Adolescent 🧒' : 'Adult 🧑'
+                        });
+                        const botResponse = { text: data.response, sender: 'bot' };
+                        setMessages(prev => [...prev, botResponse]);
+                        await speakText(data.response);
+                    }
+                } catch (error) {
+                    setMessages(prev => [...prev, { text: 'Error connecting to server', sender: 'bot' }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col">
+                    <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col">
+                        <div className="text-center p-4 border-b border-gray-700">
+                            <h1 className="text-2xl font-bold text-emerald-400 mb-2">🪞 Mirror Bot</h1>
+                            <p className="text-gray-400 text-sm">AI companion that learns and speaks</p>
+                            <div className="flex justify-center gap-4 mt-3">
+                                <div className="bg-gray-800 px-3 py-1 rounded-lg text-xs">
+                                    <span className="text-emerald-400">Level {growthStats.wordsLearned < 10 ? 1 : growthStats.wordsLearned < 25 ? 2 : 3}</span>
+                                    <span className="text-gray-400 ml-2">• {growthStats.stage}</span>
+                                </div>
+                                <div className="bg-gray-800 px-3 py-1 rounded-lg text-xs">
+                                    <span className="text-blue-400">{growthStats.wordsLearned}</span>
+                                    <span className="text-gray-400 ml-1">words learned</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {messages.length === 0 ? (
+                                <div className="text-center py-20">
+                                    <div className="text-5xl mb-4">🤖</div>
+                                    <h3 className="text-lg text-gray-300 mb-2">Welcome to Mirror Bot!</h3>
+                                    <p className="text-gray-500">Start a conversation and watch me learn from you.</p>
+                                </div>
+                            ) : (
+                                messages.map((msg, i) => (
+                                    <div key={i} className={\`mb-3 \${msg.sender === 'user' ? 'text-right' : 'text-left'}\`}>
+                                        <span className={\`inline-block px-4 py-2 rounded-xl max-w-xs \${msg.sender === 'user' ? 'bg-emerald-600' : 'bg-gray-700'}\`}>
+                                            {msg.text}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                            {isLoading && (
+                                <div className="text-left">
+                                    <div className="bg-gray-700 px-4 py-2 rounded-xl inline-block">
+                                        <div className="flex space-x-1">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-700">
+                            <div className="flex gap-2">
+                                <input
+                                    className="flex-1 bg-gray-800 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                                    placeholder="Type your message..."
+                                    disabled={isLoading}
+                                />
+                                <button
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg"
+                                    onClick={sendMessage}
+                                    disabled={isLoading}
+                                >
+                                    Send
+                                </button>
+                                <button
+                                    className={\`bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg \${isListening ? 'animate-pulse bg-red-600' : ''}\`}
+                                    onClick={handleVoiceInput}
+                                >
+                                    🎤
+                                </button>
+                                <button
+                                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg"
+                                    onClick={() => setShowGrowth(!showGrowth)}
+                                >
+                                    📊
+                                </button>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500 flex justify-between">
+                                <div>
+                                    {isListening && <span className="text-red-400">🎤 Listening...</span>}
+                                    {isSpeaking && <span className="text-emerald-400">🔊 Speaking...</span>}
+                                </div>
+                                <span>Press Enter to send</span>
+                            </div>
+                        </div>
+
+                        {showGrowth && (
+                            <div className="mx-4 mb-4 p-4 bg-gray-800 rounded-xl">
+                                <h3 className="text-emerald-400 font-bold mb-2">Growth Dashboard</h3>
+                                <ul className="text-sm space-y-1">
+                                    <li>Words Learned: {growthStats.wordsLearned}</li>
+                                    <li>Current Stage: {growthStats.stage}</li>
+                                    <li>Next Milestone: {growthStats.wordsLearned < 50 ? '50 words for Adult stage' : 'Maximum development reached'}</li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                    <audio ref={audioRef} style={{display: 'none'}} />
+                </div>
+            );
+        }
+
+        ReactDOM.render(<MirrorBot />, document.getElementById('root'));
+    </script>
+</body>
+</html>`);
+  });
 
   // Create a new bot
   app.post("/api/bot", async (req, res) => {
