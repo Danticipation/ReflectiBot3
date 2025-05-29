@@ -9,7 +9,7 @@ import { insertBotSchema, insertMessageSchema, type ChatMessage, type LearningUp
 import { z } from "zod";
 import { OpenAI } from "openai";
 import dayjs from "dayjs";
-import { ElevenLabs } from "elevenlabs";
+
 
 // Simple NLP for extracting keywords
 function extractKeywords(text: string): string[] {
@@ -450,23 +450,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Text is required' });
       }
 
-      const elevenLabs = new ElevenLabs({
-        apiKey: process.env.ELEVENLABS_API_KEY
+      const headers: Record<string, string> = {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': process.env.ELEVENLABS_API_KEY!
+      };
+
+      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        })
       });
 
-      // Use a natural-sounding voice (Rachel is a good default)
-      const audioStream = await elevenLabs.generate({
-        voice: "Rachel",
-        text: text,
-        model_id: "eleven_monolingual_v1"
-      });
-
-      // Convert stream to buffer
-      const chunks: Buffer[] = [];
-      for await (const chunk of audioStream) {
-        chunks.push(chunk);
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status}`);
       }
-      const audioBuffer = Buffer.concat(chunks);
+
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
 
       res.set({
         'Content-Type': 'audio/mpeg',
