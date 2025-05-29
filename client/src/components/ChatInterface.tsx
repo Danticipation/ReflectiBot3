@@ -173,41 +173,41 @@ export function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-gray-700 bg-gray-900">
+      <div className="p-3 border-t border-gray-700 bg-gray-900">
         <div className="flex gap-2">
           <Input
             className="flex-grow bg-gray-800 border border-gray-600 text-white placeholder-gray-400"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="Type something reflective..."
+            placeholder="Type or speak your thoughts..."
           />
           <Button 
-            className="bg-emerald-600 hover:bg-emerald-700 text-white" 
+            className="min-w-[3rem] bg-emerald-600 hover:bg-emerald-700 text-white" 
             onClick={sendMessage}
           >
-            Send
+            📨
           </Button>
           <Button 
-            className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isListening ? 'animate-pulse' : ''}`}
+            className={`min-w-[3rem] bg-indigo-600 hover:bg-indigo-700 text-white ${isListening ? 'animate-pulse' : ''}`}
             onClick={handleVoiceInput}
           >
             🎤
           </Button>
           <Button 
-            className="bg-yellow-600 hover:bg-yellow-700 text-white" 
+            className="min-w-[3rem] bg-yellow-600 hover:bg-yellow-700 text-white" 
             onClick={toggleGrowthPanel}
           >
             📊
           </Button>
           <Button 
-            className="bg-pink-600 hover:bg-pink-700 text-white" 
+            className="min-w-[3rem] bg-pink-600 hover:bg-pink-700 text-white" 
             onClick={() => setShowPrompt(true)}
           >
             🧠
           </Button>
           <Button 
-            className="bg-purple-700 hover:bg-purple-800 text-white" 
+            className="min-w-[3rem] bg-purple-700 hover:bg-purple-800 text-white" 
             onClick={toggleSummaryPanel}
           >
             📅
