@@ -172,13 +172,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
 
-      const elevenlabs = await import("elevenlabs");
+      const { ElevenLabs } = await import("elevenlabs");
       
       if (!process.env.ELEVENLABS_API_KEY) {
         return res.status(500).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const client = new elevenlabs.ElevenLabsApi({
+      const client = new ElevenLabs({
         apiKey: process.env.ELEVENLABS_API_KEY
       });
 
@@ -205,6 +205,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Text-to-speech error:', error);
       res.status(500).json({ error: "Failed to generate speech" });
+    }
+  });
+
+  // Weekly summary endpoint
+  app.post("/api/weekly-summary", async (req, res) => {
+    try {
+      const { botId } = req.body;
+      
+      if (!botId) {
+        return res.status(400).json({ error: "Bot ID is required" });
+      }
+
+      // Get recent messages for the bot
+      const messages = await storage.getMessages(botId);
+      const learnedWords = await storage.getLearnedWords(botId);
+      const milestones = await storage.getMilestones(botId);
+
+      // Generate summary based on recent activity
+      const recentMessages = messages.slice(-20); // Last 20 messages
+      const totalConversations = Math.floor(messages.length / 2);
+      
+      let summary = `This week, you've had ${totalConversations} conversations with me. `;
+      
+      if (learnedWords.length > 0) {
+        const recentWords = learnedWords.slice(-10).map(w => w.word).join(', ');
+        summary += `I've learned ${learnedWords.length} words from you, including recent ones like: ${recentWords}. `;
+      }
+      
+      if (milestones.length > 0) {
+        const latestMilestone = milestones[milestones.length - 1];
+        summary += `We reached a new milestone: ${latestMilestone.title}. `;
+      }
+      
+      // Analyze conversation themes
+      const conversationText = recentMessages.map(m => m.content).join(' ');
+      const commonWords = extractKeywords(conversationText).slice(0, 5);
+      
+      if (commonWords.length > 0) {
+        summary += `Our conversations often touch on themes like ${commonWords.join(', ')}. `;
+      }
+      
+      summary += `I'm continuing to learn from your unique way of expressing yourself and look forward to growing together.`;
+
+      res.json({ summary });
+
+    } catch (error) {
+      console.error('Weekly summary error:', error);
+      res.status(500).json({ error: "Failed to generate weekly summary" });
     }
   });
 

@@ -6,6 +6,19 @@ interface Message {
   timestamp: Date;
 }
 
+const journalingPrompts = [
+  "What made you smile recently?",
+  "Is there anything weighing on your mind?",
+  "What's one thing you're proud of this week?",
+  "What's something you wish others understood about you?",
+  "What are you avoiding right now that you probably shouldn't be?",
+  "Describe a moment when you felt truly yourself.",
+  "What would your younger self be surprised to know about you now?",
+  "What's a small daily ritual that brings you peace?",
+  "If you could have a conversation with anyone, who would it be and why?",
+  "What's something you've learned about yourself this week?"
+];
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -17,6 +30,11 @@ function App() {
   });
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showGrowth, setShowGrowth] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [weeklySummary, setWeeklySummary] = useState<string>('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -139,6 +157,40 @@ function App() {
     }
   };
 
+  const sendJournalingPrompt = () => {
+    const prompt = journalingPrompts[Math.floor(Math.random() * journalingPrompts.length)];
+    const promptMessage: Message = {
+      text: `Here's a reflection question for you: ${prompt}`,
+      sender: 'bot',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, promptMessage]);
+    setShowPrompt(false);
+  };
+
+  const generateWeeklySummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const response = await fetch('/api/weekly-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botId: 1 })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWeeklySummary(data.summary);
+      } else {
+        setWeeklySummary('Unable to generate weekly summary at this time.');
+      }
+    } catch (error) {
+      console.error('Summary error:', error);
+      setWeeklySummary('Unable to generate weekly summary at this time.');
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -236,6 +288,24 @@ function App() {
           >
             🎤
           </button>
+          <button 
+            onClick={() => setShowGrowth(!showGrowth)}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg"
+          >
+            📊
+          </button>
+          <button 
+            onClick={() => setShowPrompt(!showPrompt)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg"
+          >
+            🧠
+          </button>
+          <button 
+            onClick={() => setShowSummary(!showSummary)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg"
+          >
+            📝
+          </button>
         </div>
         
         <div className="mt-2 text-xs text-gray-500 flex justify-between">
@@ -246,6 +316,85 @@ function App() {
           <span>Press Enter to send</span>
         </div>
       </div>
+
+      {/* Growth Dashboard */}
+      {showGrowth && (
+        <div className="w-full max-w-4xl mt-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold text-emerald-400 mb-3">Growth Dashboard</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-400">{botStats.level}</div>
+              <div className="text-gray-400">Current Level</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-emerald-400">{botStats.wordsLearned}</div>
+              <div className="text-gray-400">Words Learned</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400">{botStats.stage}</div>
+              <div className="text-gray-400">Development Stage</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-400">{messages.length}</div>
+              <div className="text-gray-400">Total Messages</div>
+            </div>
+          </div>
+          <div className="mt-4 text-xs text-gray-400">
+            <p>Next milestone: {botStats.wordsLearned < 10 ? '10 words for Child stage' : botStats.wordsLearned < 25 ? '25 words for Adolescent stage' : botStats.wordsLearned < 50 ? '50 words for Adult stage' : 'Maximum development reached'}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Journaling Prompts */}
+      {showPrompt && (
+        <div className="w-full max-w-4xl mt-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold text-purple-400 mb-3">Reflection Time</h3>
+          <p className="text-gray-300 mb-4">Ready for a thoughtful question to deepen our conversation?</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={sendJournalingPrompt}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"
+            >
+              Give me a prompt
+            </button>
+            <button 
+              onClick={() => setShowPrompt(false)}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Summary */}
+      {showSummary && (
+        <div className="w-full max-w-4xl mt-4 p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold text-indigo-400 mb-3">Weekly Summary</h3>
+          {weeklySummary ? (
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <p className="text-gray-300 leading-relaxed">{weeklySummary}</p>
+            </div>
+          ) : (
+            <p className="text-gray-400 mb-4">Generate an AI summary of your conversations and growth this week.</p>
+          )}
+          <div className="flex gap-2 mt-4">
+            <button 
+              onClick={generateWeeklySummary}
+              disabled={summaryLoading}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg"
+            >
+              {summaryLoading ? 'Generating...' : 'Generate Summary'}
+            </button>
+            <button 
+              onClick={() => setShowSummary(false)}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
