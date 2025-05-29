@@ -72,7 +72,7 @@ export default function WhisperRecorder({ onTranscription, onResponse }: Whisper
               }
 
               // Play TTS response
-              const ttsRes = await fetch('/api/tts', {
+              const ttsRes = await fetch('/api/text-to-speech', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: chatData.response })
