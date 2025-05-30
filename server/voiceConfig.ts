@@ -1,43 +1,21 @@
-// Voice Configuration for Reflectibot
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
-export const defaultVoiceId = "iCrDUkL56s3C8sCRl7wb"; // Hope
-
-export const baseVoices = [
-  {
-    name: "Hope",
-    id: "iCrDUkL56s3C8sCRl7wb",
-    description: "Warm, soothing, captivating American female",
-    accent: "American",
-    gender: "Female",
-    default: true
+export default defineConfig({
+  plugins: [
+    react(),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets"),
+    },
   },
-  {
-    name: "Ophelia",
-    id: "FA6HhUjVbervLw2rNl8M",
-    description: "Calm, articulate British female",
-    accent: "British",
-    gender: "Female"
+  root: path.resolve(__dirname, "client"),
+  build: {
+    outDir: path.resolve(__dirname, "dist/public"),
+    emptyOutDir: true,
   },
-  {
-    name: "Adam",
-    id: "NFG5qt843uXKj4pFvR7C",
-    description: "Laid-back, late-night British male",
-    accent: "British",
-    gender: "Male"
-  },
-  {
-    name: "Dan",
-    id: "a4CnuaYbALRvW39mDitg",
-    description: "Smooth, grounded American male",
-    accent: "American",
-    gender: "Male"
-  }
-];
-
-export function getVoiceById(id: string) {
-  return baseVoices.find((voice) => voice.id === id) || baseVoices[0];
-}
-
-export function getDefaultVoice() {
-  return baseVoices.find((voice) => voice.default) || baseVoices[0];
-}
+});
