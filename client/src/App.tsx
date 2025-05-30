@@ -222,6 +222,16 @@ const AppComponent = () => {
             </button>
           </div>
           
+          {/* Voice Selection Button */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowVoiceSelector(true)}
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-3 px-6 rounded-xl font-medium transition-all shadow-lg"
+            >
+              🎤 Change Lily's Voice
+            </button>
+          </div>
+
           {/* Voice Recorder */}
           <div className="mb-4">
             <WhisperRecorder 
