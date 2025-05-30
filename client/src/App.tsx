@@ -247,7 +247,7 @@ const AppComponent = () => {
           </div>
 
           {/* Action Buttons - Updated Layout */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-2 mb-3">
             <button 
               onClick={() => setShowMemory(!showMemory)}
               className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
@@ -258,19 +258,21 @@ const AppComponent = () => {
               onClick={() => setShowReflection(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              📘 Notes
+              📘 Reflection
             </button>
             <button 
-              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+              onClick={() => setShowVoiceSelector(true)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              🎵 Voice
+              🎤 Voice
             </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 mb-3">
             <button 
               onClick={() => setShowUserSwitch(!showUserSwitch)}
               className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              👤 User
+              👤 Switch User
             </button>
           </div>
           
