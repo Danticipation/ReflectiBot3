@@ -239,25 +239,31 @@ const AppComponent = () => {
             />
           </div>
 
-          {/* Control Buttons */}
-          <div className="flex gap-3 mb-2 justify-center flex-wrap">
+          {/* Action Buttons - Updated Layout */}
+          <div className="grid grid-cols-4 gap-2 mb-3">
             <button 
-              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-              className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
+              onClick={() => setShowMemory(!showMemory)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              🎙️ Voice Options
+              🧠 Memory
+            </button>
+            <button 
+              onClick={() => setShowReflection(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
+            >
+              📘 Notes
             </button>
             <button 
               onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              🎙️ Voice Options
+              🎵 Voice
             </button>
             <button 
-              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-              className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-all shadow-md text-sm"
+              onClick={() => setShowUserSwitch(!showUserSwitch)}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
             >
-              🎙️ Voice Settings
+              👤 User
             </button>
           </div>
           

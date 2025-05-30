@@ -360,13 +360,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Learn new words
-      const learnedWords = await storage.getLearnedWords(botId);
+      const learnedWords = await storage.getLearnedWords(bot.id);
       const existingWords = learnedWords.map(w => w.word);
       
       for (const word of keywords) {
         if (!existingWords.includes(word)) {
           await storage.createOrUpdateWord({
-            botId,
+            botId: bot.id,
             word,
             frequency: 1,
             context: message.substring(0, 200)
@@ -375,15 +375,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate AI response
-      const response = await generateResponse(message, botId, bot.userId);
+      const response = await generateResponse(message, bot.id, bot.userId);
       
       // Save conversation
-      await storage.createMessage({ botId, sender: 'user', text: message });
-      await storage.createMessage({ botId, sender: 'bot', text: response });
+      await storage.createMessage({ botId: bot.id, sender: 'user', text: message });
+      await storage.createMessage({ botId: bot.id, sender: 'bot', text: response });
       
       // Update bot stats
-      const updatedWords = await storage.getLearnedWords(botId);
-      await storage.updateBot(botId, { wordsLearned: updatedWords.length });
+      const updatedWords = await storage.getLearnedWords(bot.id);
+      await storage.updateBot(bot.id, { wordsLearned: updatedWords.length });
       
       res.json({
         response,
