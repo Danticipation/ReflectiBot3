@@ -589,6 +589,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Voice command handling endpoint
+  router.post('/api/voice-command', async (req, res) => {
+    try {
+      const { command, userId = 1 } = req.body;
+      
+      if (command === 'list voices') {
+        return res.json({ 
+          message: "Available voices:\n• Hope - Warm American female\n• Ophelia - Calm British female\n• Adam - Laid-back British male\n• Dan - Smooth American male\n\nType 'set voice [name]' to change.",
+          voices: baseVoices 
+        });
+      }
+      
+      if (command.startsWith('set voice ')) {
+        const voiceName = command.replace('set voice ', '').toLowerCase();
+        const voice = baseVoices.find(v => v.name.toLowerCase() === voiceName);
+        
+        if (voice) {
+          await storage.createUserFact({
+            userId,
+            fact: `User prefers voice: ${voice.id}`,
+            category: 'voice_preference'
+          });
+          
+          return res.json({ 
+            message: `Voice changed to ${voice.name} (${voice.description}). This will apply to new messages from me.`,
+            voice: voice
+          });
+        } else {
+          return res.json({ 
+            message: "Voice not found. Available voices: Hope, Ophelia, Adam, Dan" 
+          });
+        }
+      }
+      
+      return res.json({ 
+        message: "Voice commands:\n• 'list voices' - Show available voices\n• 'set voice [name]' - Change voice" 
+      });
+    } catch (error) {
+      console.error('Voice command error:', error);
+      res.status(500).json({ error: 'Voice command failed' });
+    }
+  });
+
   app.use(router);
 
   return httpServer;
