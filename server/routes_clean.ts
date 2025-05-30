@@ -574,13 +574,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Text is required' });
       }
 
-      // Get user's selected voice preference
+      // Get user's selected voice preference (get the most recent one)
       const facts = await storage.getUserFacts(userId);
-      const voiceFact = facts.find(f => f.category === 'voice_preference');
+      const voiceFacts = facts.filter(f => f.category === 'voice_preference');
       let voiceId = defaultVoiceId;
       
-      if (voiceFact) {
-        voiceId = voiceFact.fact.replace('User prefers voice: ', '');
+      if (voiceFacts.length > 0) {
+        // Get the most recent voice preference
+        const latestVoiceFact = voiceFacts.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+        voiceId = latestVoiceFact.fact.replace('User prefers voice: ', '');
+        console.log(`Using voice ID: ${voiceId} from fact: ${latestVoiceFact.fact}`);
       }
 
       // Use selected voice with neutral settings
