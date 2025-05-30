@@ -207,6 +207,13 @@ const AppComponent = () => {
               disabled={loading}
             />
             <button
+              onClick={() => setShowVoiceSelector(true)}
+              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-3 rounded-xl font-medium transition-all shadow-lg"
+              title="Change Lily's Voice"
+            >
+              🎤
+            </button>
+            <button
               onClick={sendMessage}
               disabled={loading || !input.trim()}
               className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-lg"
