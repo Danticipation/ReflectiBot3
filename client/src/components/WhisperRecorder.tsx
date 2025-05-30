@@ -120,7 +120,7 @@ export default function WhisperRecorder({ onTranscription, onResponse }: Whisper
             onClick={sendToBot}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
           >
-            Send to Lily
+            Send Message
           </button>
         </div>
       )}
