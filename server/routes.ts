@@ -296,13 +296,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Conversation Engine - Main chat endpoint
   app.post('/api/chat', async (req, res) => {
     try {
-      const { message, botId } = req.body;
+      const { message, userId = 1 } = req.body;
       
-      if (!message || !botId) {
-        return res.status(400).json({ error: 'message and botId required' });
+      if (!message) {
+        return res.status(400).json({ error: 'message required' });
       }
 
-      const bot = await storage.getBot(botId);
+      // Handle voice commands
+      const lowerMessage = message.toLowerCase().trim();
+      if (lowerMessage === 'list voices') {
+        return res.json({
+          response: "Available voices:\n• Hope - Warm American female\n• Ophelia - Calm British female\n• Adam - Laid-back British male\n• Dan - Smooth American male\n\nType 'set voice [name]' to change my voice."
+        });
+      }
+      
+      if (lowerMessage.startsWith('set voice ')) {
+        const voiceName = lowerMessage.replace('set voice ', '');
+        const { baseVoices } = await import('./voiceConfig.js');
+        const voice = baseVoices.find(v => v.name.toLowerCase() === voiceName);
+        
+        if (voice) {
+          await storage.createUserFact({
+            userId,
+            fact: `User prefers voice: ${voice.id}`,
+            category: 'voice_preference'
+          });
+          
+          return res.json({
+            response: `Voice changed to ${voice.name} (${voice.description}). This will apply to my future responses.`
+          });
+        } else {
+          return res.json({
+            response: "Voice not found. Available voices: Hope, Ophelia, Adam, Dan"
+          });
+        }
+      }
+
+      const bot = await storage.getBotByUserId(userId);
       if (!bot) {
         return res.status(404).json({ error: 'Bot not found' });
       }
