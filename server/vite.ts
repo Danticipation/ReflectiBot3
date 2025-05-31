@@ -1,85 +1,45 @@
-import express, { type Express } from "express";
-import fs from "fs";
-import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-import { type Server } from "http";
-import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
+import type { Express } from "express";
+import type { Server } from "http";
 
-const viteLogger = createLogger();
-
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true,
-  };
-
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
-
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-
-    try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
-
-      // always reload the index.html file from disk incase it changes
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
-    }
-  });
-}
-
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
-
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+export async function setupVite(app: Express, server: Server): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, serve static files
+    const path = await import('path');
+    app.use('/', (await import('express')).static(path.join(process.cwd(), 'dist')));
+    
+    // Serve React app for all non-API routes
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+      }
+    });
+  } else {
+    // In development, you can add Vite dev server setup here
+    console.log('Development mode - add Vite dev server configuration if needed');
+    
+    // For now, just serve a simple response for the root
+    app.get('/', (req, res) => {
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Reflectibot API</title>
+          </head>
+          <body>
+            <h1>Reflectibot API Server</h1>
+            <p>Your AI bot API is running!</p>
+            <p>Available endpoints:</p>
+            <ul>
+              <li>POST /api/chat - Chat with the bot</li>
+              <li>GET /api/bot/:id - Get bot info</li>
+              <li>POST /api/bot - Create/get bot</li>
+              <li>GET /api/stats - Get learning stats</li>
+              <li>POST /api/tts - Text to speech</li>
+              <li>POST /api/transcribe - Speech to text</li>
+            </ul>
+          </body>
+        </html>
+      `);
+    });
   }
-
-  app.use(express.static(distPath));
-
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
-  });
 }
