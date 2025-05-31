@@ -1,126 +1,87 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// shared/schema.ts - Create this file in your shared directory
+import { pgTable, serial, text, integer, timestamp, jsonb, varchar } from 'drizzle-orm/pg-core';
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+// Users table
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: varchar('username', { length: 50 }).notNull().unique(),
+  email: varchar('email', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
-export const userMemories = pgTable("user_memories", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  memory: text("memory").notNull(),
-  category: text("category").default('conversation'),
-  importance: text("importance").default('medium'),
-  createdAt: timestamp("created_at").defaultNow(),
+// Bots table
+export const bots = pgTable('bots', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  name: varchar('name', { length: 100 }).notNull(),
+  level: integer('level').default(1),
+  wordsLearned: integer('words_learned').default(0),
+  personalityTraits: jsonb('personality_traits'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
-export const userFacts = pgTable("user_facts", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  fact: text("fact").notNull(),
-  category: text("category").default('personal'),
-  confidence: text("confidence").default('medium'),
-  createdAt: timestamp("created_at").defaultNow(),
+// Messages table
+export const messages = pgTable('messages', {
+  id: serial('id').primaryKey(),
+  botId: integer('bot_id').references(() => bots.id),
+  sender: varchar('sender', { length: 20 }).notNull(),
+  text: text('text').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const bots = pgTable("bots", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  name: text("name").notNull().default("Mirror"),
-  level: integer("level").notNull().default(1),
-  wordsLearned: integer("words_learned").notNull().default(0),
-  personalityTraits: jsonb("personality_traits").notNull().default({}),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Learned words table
+export const learnedWords = pgTable('learned_words', {
+  id: serial('id').primaryKey(),
+  botId: integer('bot_id').references(() => bots.id),
+  word: varchar('word', { length: 100 }).notNull(),
+  frequency: integer('frequency').default(1),
+  context: text('context'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const messages = pgTable("messages", {
-  id: serial("id").primaryKey(),
-  botId: integer("bot_id").notNull(),
-  sender: text("sender").notNull(),
-  text: text("text").notNull(),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
+// Milestones table
+export const milestones = pgTable('milestones', {
+  id: serial('id').primaryKey(),
+  botId: integer('bot_id').references(() => bots.id),
+  type: varchar('type', { length: 50 }).notNull(),
+  description: text('description'),
+  achievedAt: timestamp('achieved_at').defaultNow()
 });
 
-export const learnedWords = pgTable("learned_words", {
-  id: serial("id").primaryKey(),
-  botId: integer("bot_id").notNull(),
-  word: text("word").notNull(),
-  frequency: integer("frequency").notNull().default(1),
-  context: text("context"),
-  firstLearnedAt: timestamp("first_learned_at").notNull().defaultNow(),
+// User memories table
+export const userMemories = pgTable('user_memories', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  memory: text('memory').notNull(),
+  category: varchar('category', { length: 50 }).default('conversation'),
+  importance: varchar('importance', { length: 20 }).default('medium'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const milestones = pgTable("milestones", {
-  id: serial("id").primaryKey(),
-  botId: integer("bot_id").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  achievedAt: timestamp("achieved_at").notNull().defaultNow(),
+// User facts table
+export const userFacts = pgTable('user_facts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  fact: text('fact').notNull(),
+  category: varchar('category', { length: 50 }).default('general'),
+  confidence: varchar('confidence', { length: 20 }).default('medium'),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export const insertBotSchema = createInsertSchema(bots).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  timestamp: true,
-});
-
-export const insertLearnedWordSchema = createInsertSchema(learnedWords).omit({
-  id: true,
-  firstLearnedAt: true,
-});
-
-export const insertMilestoneSchema = createInsertSchema(milestones).omit({
-  id: true,
-  achievedAt: true,
-});
-
-export const insertUserMemorySchema = createInsertSchema(userMemories).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertUserFactSchema = createInsertSchema(userFacts).omit({
-  id: true,
-  createdAt: true,
-});
-
+// Type exports
 export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertUser = typeof users.$inferInsert;
 export type Bot = typeof bots.$inferSelect;
-export type InsertBot = z.infer<typeof insertBotSchema>;
+export type InsertBot = typeof bots.$inferInsert;
 export type Message = typeof messages.$inferSelect;
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertMessage = typeof messages.$inferInsert;
 export type LearnedWord = typeof learnedWords.$inferSelect;
-export type InsertLearnedWord = z.infer<typeof insertLearnedWordSchema>;
+export type InsertLearnedWord = typeof learnedWords.$inferInsert;
 export type Milestone = typeof milestones.$inferSelect;
-export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type InsertMilestone = typeof milestones.$inferInsert;
 export type UserMemory = typeof userMemories.$inferSelect;
-export type InsertUserMemory = z.infer<typeof insertUserMemorySchema>;
+export type InsertUserMemory = typeof userMemories.$inferInsert;
 export type UserFact = typeof userFacts.$inferSelect;
-export type InsertUserFact = z.infer<typeof insertUserFactSchema>;
-
-// WebSocket message types
-export interface ChatMessage {
-  type: 'user_message' | 'bot_response' | 'learning_update' | 'milestone_achieved';
-  content?: string;
-  botId: number;
-  data?: any;
-}
-
-export interface LearningUpdate {
-  newWords: string[];
-  levelUp?: boolean;
-  personalityUpdate?: Record<string, number>;
-}
+export type InsertUserFact = typeof userFacts.$inferInsert;
