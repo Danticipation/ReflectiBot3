@@ -1,30 +1,33 @@
 // server/index.ts
 import 'dotenv/config';
-import express from 'express';
+import express, { Express } from 'express';
+import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerRoutes } from './routes.js'; // ⬅️ Hooks in bot/chat functionality
+import { registerRoutes } from './routes.js';
 
-const app = express();
+const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware to parse JSON
-app.use(express.json());
+// Middleware
+app.use(bodyParser.json());
 
-// Serve static files from built React app
-app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
-
-// Register API routes
+// Register API + WebSocket routes
 await registerRoutes(app);
 
-// React fallback for SPA routing
+// Serve client build files (Vite's output)
+const clientDistPath = path.join(__dirname, '..', 'client');
+app.use(express.static(clientDistPath));
+
+// Fallback to index.html for SPA routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`🔥 Server running on http://localhost:${PORT}`);
 });
