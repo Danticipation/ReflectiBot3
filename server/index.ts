@@ -1,22 +1,46 @@
-// server/index.ts
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { registerRoutes } from './routes.js';
 
+// Create Express application
 const app = express();
-const PORT = process.env.PORT || 5000;
+app.use(express.json());
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// CORS middleware
+const corsMiddleware: express.RequestHandler = (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+};
 
-// Serve static files from client/dist
-app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
+// Apply middleware to routes
+app.use('/api', corsMiddleware);
 
-// Fallback to index.html for React Router
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
-});
+// Static files middleware
+app.use(express.static('public'));
 
-app.listen(PORT, () => {
-  console.log(`🔥 Server running on http://localhost:${PORT}`);
-});
+// Register API routes
+async function startServer() {
+  try {
+    const httpServer = await registerRoutes(app);
+    
+    // Start server
+    const PORT = process.env.PORT || 3000;
+    httpServer.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

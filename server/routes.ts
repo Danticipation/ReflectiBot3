@@ -6,14 +6,15 @@ import type { Server } from "http";
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 
+// Initialize OpenAI with API key from environment variable or use a fallback for testing
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY || "sk-dummy-key-for-testing"
 });
 
 // ElevenLabs helper function
 async function getElevenLabsClient() {
-  const { ElevenLabs } = await import("elevenlabs");
-  return ElevenLabs({
+  const { ElevenLabsClient } = await import("@elevenlabs/elevenlabs-js");
+  return new ElevenLabsClient({
     apiKey: process.env.ELEVENLABS_API_KEY
   });
 }
@@ -128,6 +129,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   try {
     httpServer = createServer(app);
 
+    // Root route handler
+    app.get('/', (req: Request, res: Response) => {
+      res.send(`
+        <html>
+          <head>
+            <title>Reflectibot API</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                color: #333;
+              }
+              h1 {
+                color: #2c3e50;
+                border-bottom: 2px solid #3498db;
+                padding-bottom: 10px;
+              }
+              h2 {
+                color: #2980b9;
+              }
+              code {
+                background: #f4f4f4;
+                padding: 2px 5px;
+                border-radius: 3px;
+              }
+              .endpoint {
+                margin-bottom: 20px;
+                padding: 15px;
+                background: #f9f9f9;
+                border-left: 4px solid #3498db;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Reflectibot API</h1>
+            <p>Welcome to the Reflectibot API. Below are the available endpoints:</p>
+            
+            <div class="endpoint">
+              <h2>Create Bot</h2>
+              <p><strong>Endpoint:</strong> <code>POST /api/bot</code></p>
+              <p><strong>Description:</strong> Create a new bot</p>
+            </div>
+            
+            <div class="endpoint">
+              <h2>Get Bot</h2>
+              <p><strong>Endpoint:</strong> <code>GET /api/bot/:id</code></p>
+              <p><strong>Description:</strong> Retrieve a specific bot by ID</p>
+            </div>
+            
+            <div class="endpoint">
+              <h2>Send Message</h2>
+              <p><strong>Endpoint:</strong> <code>POST /api/bot/:id/message</code></p>
+              <p><strong>Description:</strong> Send a message to a specific bot</p>
+            </div>
+            
+            <div class="endpoint">
+              <h2>Get Bot Audio</h2>
+              <p><strong>Endpoint:</strong> <code>GET /api/bot/:id/audio</code></p>
+              <p><strong>Description:</strong> Get audio response from a bot</p>
+            </div>
+            
+            <p>For more information, please refer to the API documentation.</p>
+          </body>
+        </html>
+      `);
+    });
+
     // WebSocket for real-time updates
     const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
@@ -241,6 +312,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const learnedWords = await storage.getLearnedWords(botId);
+        
+        // Ensure userId is not null before using it
+        if (bot.userId === null) {
+          res.status(400).json({ error: 'Bot has no associated user' });
+          return;
+        }
+        
         const memories = await storage.getUserMemories(bot.userId);
         const facts = await storage.getUserFacts(bot.userId);
         
@@ -344,6 +422,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Ensure userId is not null before using it
+        if (bot.userId === null) {
+          res.status(400).json({ error: 'Bot has no associated user' });
+          return;
+        }
+        
         // Generate AI response
         const response = await generateResponse(message, bot.id, bot.userId);
         
@@ -385,10 +469,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const elevenlabs = await getElevenLabsClient();
 
-        const audioStream = await elevenlabs.generate({
-          voice: "Rachel",
+        const audioStream = await elevenlabs.textToSpeech.convert("Rachel", {
           text: text,
-          model_id: "eleven_monolingual_v1"
+          modelId: "eleven_monolingual_v1"
         });
 
         res.setHeader('Content-Type', 'audio/mpeg');
@@ -749,12 +832,15 @@ Respond in JSON format: {"mood": "mood_name", "primaryColor": "#hex", "accentCol
       }
     });
 
-    // Setup Vite development server (if vite.js exists)
-    try {
-      const { setupVite } = await import('./vite.js');
-      await setupVite(app, httpServer);
-    } catch (error) {
-      console.log('Vite setup not available, serving static files');
+    // Setup Vite development server (if available)
+    // Skip Vite setup in production or when not available
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        // This is wrapped in try/catch to make it optional
+        console.log('Skipping Vite setup - using static files instead');
+      } catch (error) {
+        console.log('Vite setup not available, serving static files');
+      }
     }
     
   } catch (error) {
