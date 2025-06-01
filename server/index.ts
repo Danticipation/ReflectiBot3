@@ -3,7 +3,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerRoutes } from './routes'; // ⬅️ Hooks in bot/chat functionality
+import { registerRoutes } from './routes.js'; // ⬅️ Hooks in bot/chat functionality
 
 const app = express();
 const PORT = process.env.PORT || 5000;
