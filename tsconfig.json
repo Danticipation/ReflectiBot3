@@ -1,19 +1,25 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "es2022",
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "node",
-    "outDir": "dist",
-    "rootDir": ".",
     "esModuleInterop": true,
-    "allowJs": true,
-    "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": false
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false
   },
-  "include": ["server/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "server/**/*",
+    "shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
