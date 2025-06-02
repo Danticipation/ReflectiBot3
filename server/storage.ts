@@ -21,6 +21,20 @@ const sql = neon(connectionString);
 // Initialize drizzle
 const db = drizzle(sql);
 
+// Simple table creation (for initial setup)
+async function ensureTables() {
+  try {
+    // Try to query users table, if it fails, tables don't exist
+    await db.select().from(users).limit(1);
+  } catch (error) {
+    console.log('Tables do not exist. You need to run database migrations.');
+    // You could add table creation SQL here, but for now just log the error
+  }
+}
+
+// Call it once when the module loads
+ensureTables();
+
 // Storage interface for database operations
 export const storage = {
   // User operations
