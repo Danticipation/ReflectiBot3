@@ -11,6 +11,9 @@ export default defineConfig({
       input: './index.html'
     }
   },
+  define: {
+    'process.env.NODE_ENV': '"production"'
+  },
   resolve: {
     alias: {
       '@': './src'
