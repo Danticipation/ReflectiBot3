@@ -36,7 +36,7 @@ await registerRoutes(app);
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   // Fix: Use the correct path to the client files
-  const clientDistPath = path.join(__dirname, 'client');
+  const clientDistPath = path.join(__dirname, '..', 'dist', 'client');
   app.use(express.static(clientDistPath));
   
   // Fallback to index.html for SPA routing
