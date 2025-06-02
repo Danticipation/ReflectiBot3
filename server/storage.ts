@@ -18,8 +18,8 @@ if (!connectionString) {
 // Create the neon client
 const sql = neon(connectionString);
 
-// Initialize drizzle
-const db = drizzle(sql);
+// Initialize drizzle with client wrapper
+const db = drizzle({ client: sql });
 
 // Storage interface for database operations
 export const storage = {
