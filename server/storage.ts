@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/neon-serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import { 
   users, bots, messages, learnedWords, milestones, userMemories, userFacts,
@@ -18,8 +18,8 @@ if (!connectionString) {
 // Create the neon client
 const sql = neon(connectionString);
 
-// Initialize drizzle with client wrapper
-const db = drizzle({ client: sql });
+// Initialize drizzle
+const db = drizzle(sql);
 
 // Storage interface for database operations
 export const storage = {
