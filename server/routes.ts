@@ -67,6 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat endpoint
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
+      console.log('Chat request received:', req.body);
       const { message, userId = 1 } = req.body;
 
       if (!message) {
@@ -74,16 +75,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      console.log('Getting bot for userId:', userId);
       // Get or create bot
       let bot = await storage.getBotByUserId(userId);
       if (!bot) {
+        console.log('Creating new bot for userId:', userId);
         bot = await storage.createBot({
           userId,
           name: "Reflect"
         });
       }
+      console.log('Bot found/created:', bot.id);
 
       // Store user message
+      console.log('Storing user message...');
       await storage.createMessage({
         botId: bot.id,
         sender: 'user',
@@ -91,9 +96,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Generate AI response
+      console.log('Generating AI response...');
       const aiResponse = await generateResponse(message, bot.id, userId);
+      console.log('AI response generated:', aiResponse);
 
       // Store bot response
+      console.log('Storing bot response...');
       await storage.createMessage({
         botId: bot.id,
         sender: 'bot',
@@ -101,6 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Learn words from user message
+      console.log('Learning words...');
       const keywords = extractKeywords(message);
       for (const word of keywords) {
         await storage.createOrUpdateWord({
@@ -111,6 +120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update bot stats
+      console.log('Updating bot stats...');
       const learnedWords = await storage.getLearnedWords(bot.id);
       const stage = getStageFromWordCount(learnedWords.length);
       
@@ -119,6 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         level: stage === 'Infant' ? 1 : stage === 'Toddler' ? 2 : stage === 'Child' ? 3 : stage === 'Adolescent' ? 4 : 5
       });
 
+      console.log('Chat completed successfully');
       res.json({
         response: aiResponse,
         stage: stage,
@@ -126,8 +137,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
-      console.error("Error in /api/chat endpoint:", error);
-      res.status(500).json({ error: 'Failed to process chat message' });
+      console.error("Detailed error in /api/chat endpoint:", error);
+      res.status(500).json({ 
+        error: 'Failed to process chat message',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
