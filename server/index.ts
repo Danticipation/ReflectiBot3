@@ -2,7 +2,6 @@
 import 'dotenv/config';
 import express, { Express } from 'express';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
 
@@ -43,12 +42,11 @@ if (process.env.NODE_ENV === 'production') {
   // Fallback to index.html for SPA routing
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      const indexPath = path.join(clientDistPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('Client files not found');
-      }
+      res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+        if (err) {
+          res.status(404).send('Client files not found');
+        }
+      });
     }
   });
 } else {
