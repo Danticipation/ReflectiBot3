@@ -36,17 +36,68 @@ await registerRoutes(app);
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   // Fix: Use the correct path to the client files
-  const clientDistPath = path.join(__dirname, '..', 'dist', 'client');
+  const clientDistPath = path.join(__dirname, 'client');
   app.use(express.static(clientDistPath));
   
-  // Fallback to index.html for SPA routing
+  // Fallback for SPA routing - serve a basic HTML if index.html not found
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
-        if (err) {
-          res.status(404).send('Client files not found');
-        }
-      });
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reflectibot</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+            <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+            <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+          </head>
+          <body class="bg-slate-900 text-white">
+            <div id="root">
+              <div class="min-h-screen flex items-center justify-center">
+                <div class="text-center">
+                  <h1 class="text-4xl font-bold text-emerald-400 mb-4">🤖 Reflectibot</h1>
+                  <p class="text-slate-400 mb-8">Your AI companion is loading...</p>
+                  <div class="space-y-4">
+                    <input id="messageInput" type="text" placeholder="Type your message..." 
+                           class="w-80 px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                    <button onclick="sendMessage()" 
+                            class="block mx-auto px-6 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg">
+                      Send Message
+                    </button>
+                  </div>
+                  <div id="response" class="mt-4 p-4 bg-slate-800 rounded-lg hidden"></div>
+                </div>
+              </div>
+            </div>
+            <script>
+              async function sendMessage() {
+                const input = document.getElementById('messageInput');
+                const response = document.getElementById('response');
+                const message = input.value.trim();
+                
+                if (!message) return;
+                
+                try {
+                  const res = await axios.post('/api/chat', { message, userId: 1 });
+                  response.textContent = res.data.response;
+                  response.classList.remove('hidden');
+                  input.value = '';
+                } catch (err) {
+                  response.textContent = 'Error: ' + (err.response?.data?.error || 'Failed to send message');
+                  response.classList.remove('hidden');
+                }
+              }
+              
+              document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendMessage();
+              });
+            </script>
+          </body>
+        </html>
+      `);
     }
   });
 } else {
