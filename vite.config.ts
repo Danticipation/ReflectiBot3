@@ -11,6 +11,11 @@ export default defineConfig({
       input: './index.html'
     }
   },
+  resolve: {
+    alias: {
+      '@': './src'
+    }
+  },
   server: {
     port: 3000
   }
