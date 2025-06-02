@@ -138,9 +138,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Detailed error in /api/chat endpoint:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({ 
         error: 'Failed to process chat message',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
       });
     }
   });
