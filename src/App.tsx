@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import WhisperRecorder from './components/WhisperRecorder';
 import MemoryDashboard from './components/MemoryDashboard';
-import VoiceSelector from './components/VoiceSelector';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,10 +29,7 @@ const AppComponent = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [weeklySummary, setWeeklySummary] = useState<string>('');
-  const [showReflection, setShowReflection] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [showMemoryDashboard, setShowMemoryDashboard] = useState(false);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 
@@ -47,10 +43,6 @@ const AppComponent = () => {
         });
       })
       .catch(() => setBotStats({ level: 1, stage: 'Infant', wordsLearned: 0 }));
-
-    axios.get('/api/weekly-summary?userId=1')
-      .then(res => setWeeklySummary(res.data.summary))
-      .catch(() => setWeeklySummary('No reflections available yet.'));
   }, []);
 
   const sendMessage = async () => {
@@ -207,13 +199,6 @@ const AppComponent = () => {
               disabled={loading}
             />
             <button
-              onClick={() => setShowVoiceSelector(true)}
-              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-3 rounded-xl font-medium transition-all shadow-lg"
-              title="Change Lily's Voice"
-            >
-              🎤
-            </button>
-            <button
               onClick={sendMessage}
               disabled={loading || !input.trim()}
               className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-lg"
@@ -222,137 +207,46 @@ const AppComponent = () => {
             </button>
           </div>
           
-          {/* Voice Selection Button */}
-          <div className="mb-4">
-            <button
-              onClick={() => setShowVoiceSelector(true)}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-3 px-6 rounded-xl font-medium transition-all shadow-lg"
-            >
-              🎤 Change Lily's Voice
-            </button>
-          </div>
-
-          {/* Voice Recorder */}
-          <div className="mb-4">
-            <WhisperRecorder 
-              onTranscription={(text) => {
-                // Add voice input to chat history
-                const userMessage: Message = {
-                  sender: 'user',
-                  text: text,
-                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setMessages(prev => [...prev, userMessage]);
-              }} 
-              onResponse={(response) => {
-                // Add bot response to chat history
-                const botMessage: Message = {
-                  sender: 'bot',
-                  text: response,
-                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setMessages(prev => [...prev, botMessage]);
-              }} 
-            />
-          </div>
-
-          {/* Action Buttons - Updated Layout */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <button 
-              onClick={() => setShowMemory(!showMemory)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
-            >
-              🧠 Memory
-            </button>
-            <button 
-              onClick={() => setShowReflection(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
-            >
-              📘 Reflection
-            </button>
-            <button 
-              onClick={() => setShowVoiceSelector(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
-            >
-              🎤 Voice
-            </button>
-          </div>
-          <div className="grid grid-cols-1 gap-2 mb-3">
-            <button 
-              onClick={() => setShowUserSwitch(!showUserSwitch)}
-              className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-2 rounded-lg text-xs font-medium"
-            >
-              👤 Switch User
-            </button>
-          </div>
-          
-          <div className="text-xs text-slate-500 text-center">
-            Press Enter to send
+          <div className="flex justify-between items-center">
+            <div className="flex gap-3">
+              <WhisperRecorder 
+                onTranscription={(text) => setInput(text)} 
+                onResponse={() => {}} 
+              />
+              <button 
+                onClick={() => setShowMemoryDashboard(!showMemoryDashboard)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                🧠 Memory
+              </button>
+              <button 
+                onClick={() => setShowUserSwitch(!showUserSwitch)}
+                className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                👤 Switch User
+              </button>
+            </div>
+            <div className="text-xs text-slate-500">
+              Press Enter to send
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Weekly Reflection Modal */}
-      {showReflection && (
+      {/* Memory Dashboard Modal */}
+      {showMemoryDashboard && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-2xl w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-200">🎙️ Voice Selection</h3>
-              <button 
-                onClick={() => setShowReflection(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <VoiceSelector 
-              userId={1} 
-              onVoiceChange={(voice) => {
-                console.log('Voice changed to:', voice.name);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Memory Dashboard */}
-      {showMemory && (
-        <div className="bg-slate-800/50 backdrop-blur-sm border-t border-slate-700/50 p-6">
-          <div className="max-w-6xl mx-auto">
+          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-200">Memory Dashboard</h3>
               <button 
-                onClick={() => setShowMemory(false)}
+                onClick={() => setShowMemoryDashboard(false)}
                 className="text-slate-400 hover:text-white"
               >
                 ✕
               </button>
             </div>
             <MemoryDashboard userId={1} />
-          </div>
-        </div>
-      )}
-
-      {/* Voice Selector Modal */}
-      {showVoiceSelector && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-200">Voice Selection</h3>
-              <button 
-                onClick={() => setShowVoiceSelector(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <VoiceSelector 
-              userId={1} 
-              onVoiceChange={(voice) => {
-                console.log('Voice changed to:', voice.name);
-                // Voice change will be handled automatically by the component
-              }}
-            />
           </div>
         </div>
       )}

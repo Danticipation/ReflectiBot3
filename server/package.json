@@ -5,7 +5,9 @@
   "main": "dist/server/index.js",
   "type": "module",
   "scripts": {
-    "build": "npx tsc",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "npx tsc",
+    "build:client": "node build-client.js",
     "start": "node dist/server/index.js",
     "dev": "tsx watch server/index.ts"
   },

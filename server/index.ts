@@ -1,7 +1,6 @@
 // server/index.ts
 import 'dotenv/config';
 import express, { Express } from 'express';
-import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
@@ -13,21 +12,88 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middleware
-app.use(bodyParser.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Register API + WebSocket routes
+// CORS middleware for development
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+}
+
+// Register API routes
 await registerRoutes(app);
 
-// Serve client build files (Vite's output)
-const clientDistPath = path.join(__dirname, '..', 'client');
-app.use(express.static(clientDistPath));
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  const clientDistPath = path.join(__dirname, '..', 'client');
+  app.use(express.static(clientDistPath));
+  
+  // Fallback to index.html for SPA routing
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
+  });
+} else {
+  // Development route
+  app.get('/', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Reflectibot API</title>
+          <style>
+            body { font-family: system-ui; margin: 40px; background: #1a1a1a; color: #fff; }
+            h1 { color: #10b981; }
+            ul { background: #2a2a2a; padding: 20px; border-radius: 8px; }
+            li { margin: 8px 0; }
+            code { background: #374151; padding: 2px 6px; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <h1>🤖 Reflectibot API Server</h1>
+          <p>Your AI bot API is running on port ${PORT}!</p>
+          <h3>Available endpoints:</h3>
+          <ul>
+            <li><code>POST /api/chat</code> - Chat with the bot</li>
+            <li><code>GET /api/stats?userId=1</code> - Get learning stats</li>
+            <li><code>GET /api/bot/:id</code> - Get bot info</li>
+            <li><code>POST /api/bot</code> - Create/get bot</li>
+            <li><code>POST /api/user/switch</code> - Switch user</li>
+            <li><code>GET /api/memories/:userId</code> - Get user memories</li>
+            <li><code>GET /api/facts/:userId</code> - Get user facts</li>
+            <li><code>POST /api/text-to-speech</code> - Text to speech (placeholder)</li>
+          </ul>
+          <p>Make sure your DATABASE_URL and OPENAI_API_KEY environment variables are set!</p>
+        </body>
+      </html>
+    `);
+  });
+}
 
-// Fallback to index.html for SPA routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDistPath, 'index.html'));
+// Error handling middleware
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🔥 Server running on http://localhost:${PORT}`);
+  console.log(`🔥 Reflectibot server running on http://localhost:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🗄️  Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ Not configured'}`);
+  console.log(`🤖 OpenAI: ${process.env.OPENAI_API_KEY ? '✅ Configured' : '❌ Not configured'}`);
 });

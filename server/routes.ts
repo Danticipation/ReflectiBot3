@@ -12,10 +12,11 @@ const openai = new OpenAI({
 function getStageFromWordCount(wordCount: number): string {
   if (wordCount < 10) return "Infant";
   if (wordCount < 25) return "Toddler";
-    if (wordCount < 50) return "Child";
-    if (wordCount < 100) return "Adolescent";
-    return "Adult";
+  if (wordCount < 50) return "Child";
+  if (wordCount < 100) return "Adolescent";
+  return "Adult";
 }
+
 function extractKeywords(text: string): string[] {
   return text.toLowerCase()
     .replace(/[^\w\s]/g, '')
@@ -82,20 +83,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.status(200).send("OK");
+      // Store user message
+      await storage.createMessage({
+        botId: bot.id,
+        sender: 'user',
+        text: message
+      });
+
+      // Generate AI response
+      const aiResponse = await generateResponse(message, bot.id, userId);
+
+      // Store bot response
+      await storage.createMessage({
+        botId: bot.id,
+        sender: 'bot',
+        text: aiResponse
+      });
+
+      // Learn words from user message
+      const keywords = extractKeywords(message);
+      for (const word of keywords) {
+        await storage.createOrUpdateWord({
+          botId: bot.id,
+          word: word,
+          context: message
+        });
+      }
+
+      // Update bot stats
+      const learnedWords = await storage.getLearnedWords(bot.id);
+      const stage = getStageFromWordCount(learnedWords.length);
+      
+      await storage.updateBot(bot.id, {
+        wordsLearned: learnedWords.length,
+        level: stage === 'Infant' ? 1 : stage === 'Toddler' ? 2 : stage === 'Child' ? 3 : stage === 'Adolescent' ? 4 : 5
+      });
+
+      res.json({
+        response: aiResponse,
+        stage: stage,
+        wordsLearned: learnedWords.length
+      });
+
     } catch (error) {
       console.error("Error in /api/chat endpoint:", error);
       res.status(500).json({ error: 'Failed to process chat message' });
     }
   });
 
-  // Start the HTTP server
-  await new Promise<void>((resolve) => {
-    httpServer.listen(3000, () => {
-      console.log('Server started on port 3000');
-      resolve();
-    });
+  // Stats endpoint
+  app.get('/api/stats', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.query.userId as string) || 1;
+      
+      let bot = await storage.getBotByUserId(userId);
+      if (!bot) {
+        bot = await storage.createBot({
+          userId,
+          name: "Reflect"
+        });
+      }
+
+      const learnedWords = await storage.getLearnedWords(bot.id);
+      const stage = getStageFromWordCount(learnedWords.length);
+
+      res.json({
+        stage: stage,
+        wordCount: learnedWords.length,
+        level: stage === 'Infant' ? 1 : stage === 'Toddler' ? 2 : stage === 'Child' ? 3 : stage === 'Adolescent' ? 4 : 5
+      });
+
+    } catch (error) {
+      console.error("Error in /api/stats endpoint:", error);
+      res.status(500).json({ error: 'Failed to get stats' });
+    }
   });
 
-  return Promise.resolve(httpServer);
+  // Memory endpoints
+  app.get('/api/memories/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const memories = await storage.getUserMemories(userId);
+      res.json(memories);
+    } catch (error) {
+      console.error("Error getting memories:", error);
+      res.status(500).json({ error: 'Failed to get memories' });
+    }
+  });
+
+  app.get('/api/facts/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const facts = await storage.getUserFacts(userId);
+      res.json(facts);
+    } catch (error) {
+      console.error("Error getting facts:", error);
+      res.status(500).json({ error: 'Failed to get facts' });
+    }
+  });
+
+  // User switch endpoint
+  app.post('/api/user/switch', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body;
+      if (!name) {
+        res.status(400).json({ error: 'name required' });
+        return;
+      }
+
+      // Create new user
+      const user = await storage.createUser({
+        username: name,
+        email: `${name.toLowerCase()}@temp.com`
+      });
+
+      res.json({ userId: user.id });
+    } catch (error) {
+      console.error("Error switching user:", error);
+      res.status(500).json({ error: 'Failed to switch user' });
+    }
+  });
+
+  // Text-to-speech placeholder
+  app.post('/api/text-to-speech', async (req: Request, res: Response) => {
+    // Placeholder - implement with your TTS service
+    res.json({ status: 'TTS not implemented yet' });
+  });
+
+  return httpServer;
 }
