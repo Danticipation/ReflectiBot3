@@ -35,13 +35,19 @@ await registerRoutes(app);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  const clientDistPath = path.join(__dirname, '..', 'client');
+  // Fix: Use the correct path to the client files
+  const clientDistPath = path.join(__dirname, 'client');
   app.use(express.static(clientDistPath));
   
   // Fallback to index.html for SPA routing
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(clientDistPath, 'index.html'));
+      const indexPath = path.join(clientDistPath, 'index.html');
+      if (require('fs').existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Client files not found');
+      }
     }
   });
 } else {
