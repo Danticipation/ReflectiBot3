@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import { neon, neonConfig } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 import { 
   users, bots, messages, learnedWords, milestones, userMemories, userFacts,
   type User, type InsertUser, type Bot, type InsertBot, type Message, type InsertMessage,
@@ -9,12 +9,16 @@ import {
 import { eq, and } from 'drizzle-orm';
 
 // Initialize database connection
-neonConfig.fetchConnectionCache = true;
-const connectionString = process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/reflectibot';
-// Create the neon client with the connection string
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+// Create the neon client
 const sql = neon(connectionString);
-// Initialize drizzle with the correct configuration
-// @ts-ignore - Ignore type mismatch for now to allow build to proceed
+
+// Initialize drizzle
 const db = drizzle(sql);
 
 // Storage interface for database operations
