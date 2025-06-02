@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import express, { Express } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
 
@@ -43,7 +44,7 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       const indexPath = path.join(clientDistPath, 'index.html');
-      if (require('fs').existsSync(indexPath)) {
+      if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
         res.status(404).send('Client files not found');
