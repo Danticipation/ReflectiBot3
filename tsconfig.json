@@ -13,6 +13,10 @@
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": false
+	"baseUrl": "./src",
+"paths": {
+  "@/*": ["*"]
+}
   },
   "include": [
     "server/**/*",

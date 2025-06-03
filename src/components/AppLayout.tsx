@@ -1,7 +1,6 @@
-// AppLayout.tsx
 import React from 'react';
-import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
+import Sidebar from './layout/Sidebar';
+import Topbar from './layout/Topbar';
 import ChatWindow from './ChatWindow';
 
 export const AppLayout = () => {
@@ -18,11 +17,13 @@ export const AppLayout = () => {
   );
 };
 
+
 // Topbar.tsx
 import React from 'react';
-import logo from '/mnt/data/Reflectibot-transformed.jpeg';
+const logo = '/Reflectibot-transformed.jpeg'; // ✅ works in public/
 
-export const Topbar = () => {
+
+export const TopbarComponent = () => {
   return (
     <header className="flex items-center justify-between p-4 border-b border-zinc-800 shadow-lg">
       <div className="flex items-center space-x-3">
