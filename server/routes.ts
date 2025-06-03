@@ -247,4 +247,19 @@ export function registerRoutes(app: Express): void {
     // Placeholder - implement with your TTS service
     res.json({ status: 'TTS not implemented yet' });
   });
+
+  // Transcribe endpoint (for voice recording)
+  app.post('/api/transcribe', async (req: Request, res: Response) => {
+    try {
+      // For now, return a placeholder since we don't have OpenAI Whisper set up
+      // In a full implementation, you'd use OpenAI's Whisper API or another transcription service
+      res.json({ 
+        text: 'Voice transcription received! (OpenAI Whisper not configured yet)',
+        status: 'placeholder' 
+      });
+    } catch (error) {
+      console.error('Transcription error:', error);
+      res.status(500).json({ error: 'Transcription failed' });
+    }
+  });
 }
