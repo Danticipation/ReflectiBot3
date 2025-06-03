@@ -3,6 +3,7 @@ import multer from 'multer';
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 import { getReflectibotPrompt } from './utils/promptUtils.js';
+import { analyzeUserMessage } from './utils/personalityUtils.js';
 
 // Polyfills for fetch, FormData, and Blob in Node.js
 import fetch, { Blob } from 'node-fetch';
@@ -38,20 +39,22 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
     const memories = await storage.getUserMemories(userId);
     const facts = await storage.getUserFacts(userId);
     const learnedWords = await storage.getLearnedWords(botId);
-
+    const personality = analyzeUserMessage(userMessage);
     const stage = getStageFromWordCount(learnedWords.length);
 
     const systemPrompt = getReflectibotPrompt({
       factContext: facts.map(f => f.fact).join('\n'),
       memoryContext: memories.map(m => m.memory).join('\n'),
       stage,
-      learnedWordCount: learnedWords.length
+      learnedWordCount: learnedWords.length,
+      personality: personality.tone || "neutral"
     });
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
+
         { role: "user", content: userMessage }
       ],
       max_tokens: 150,

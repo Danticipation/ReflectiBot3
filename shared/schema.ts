@@ -70,6 +70,15 @@ export const userFacts = pgTable('user_facts', {
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
+export const userTraits = pgTable('user_traits', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  tone: text('tone'),              // e.g., “laid-back”, “formal”
+  vocabulary: text('vocabulary'),  // e.g., “bro, chill, gnarly”
+  styleNotes: text('style_notes'), // freeform field for custom observations
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
