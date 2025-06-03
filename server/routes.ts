@@ -1,6 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { createServer } from "http";
-import type { Server } from "http";
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 
@@ -61,8 +59,33 @@ Respond naturally according to your developmental stage.`;
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  const httpServer = createServer(app);
+export function registerRoutes(app: Express): void {
+  // Simple test endpoint
+  app.get('/api/test', (req: Request, res: Response) => {
+    res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
+  });
+
+  // Setup endpoint to create database tables
+  app.get('/api/setup', async (req: Request, res: Response) => {
+    try {
+      console.log('Creating database tables...');
+      
+      // Create users table
+      await storage.setupTables();
+      
+      res.json({ 
+        message: 'Database tables created successfully!',
+        status: 'ready'
+      });
+    } catch (error) {
+      console.error('Setup error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ 
+        error: 'Failed to create tables',
+        details: errorMessage
+      });
+    }
+  });
 
   // Chat endpoint
   app.post('/api/chat', async (req: Request, res: Response) => {
@@ -224,6 +247,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Placeholder - implement with your TTS service
     res.json({ status: 'TTS not implemented yet' });
   });
-
-  return httpServer;
 }

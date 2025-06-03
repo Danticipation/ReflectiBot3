@@ -31,7 +31,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Register API routes
-await registerRoutes(app);
+registerRoutes(app);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
@@ -123,8 +123,8 @@ if (process.env.NODE_ENV === 'production') {
           <ul>
             <li><code>POST /api/chat</code> - Chat with the bot</li>
             <li><code>GET /api/stats?userId=1</code> - Get learning stats</li>
-            <li><code>GET /api/bot/:id</code> - Get bot info</li>
-            <li><code>POST /api/bot</code> - Create/get bot</li>
+            <li><code>GET /api/test</code> - Test API</li>
+            <li><code>GET /api/setup</code> - Setup database tables</li>
             <li><code>POST /api/user/switch</code> - Switch user</li>
             <li><code>GET /api/memories/:userId</code> - Get user memories</li>
             <li><code>GET /api/facts/:userId</code> - Get user facts</li>
