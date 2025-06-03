@@ -4,6 +4,7 @@ import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 import { getReflectibotPrompt } from './utils/promptUtils.js';
 import { analyzeUserMessage } from './utils/personalityUtils.js';
+import { updateUserStyleAndGetPrompt } from './services/userStyleService.js';
 
 // Polyfills for fetch, FormData, and Blob in Node.js
 import fetch, { Blob } from 'node-fetch';
@@ -34,7 +35,7 @@ function extractKeywords(text: string): string[] {
 }
 
 // Generate AI response
-async function generateResponse(userMessage: string, botId: number, userId: number): Promise<string> {
+async function generateResponse(userMessage: string, botId: number, userId: number, stylePrompt?: string): Promise<string> {
   try {
     const memories = await storage.getUserMemories(userId);
     const facts = await storage.getUserFacts(userId);
@@ -47,24 +48,25 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
       memoryContext: memories.map(m => m.memory).join('\n'),
       stage,
       learnedWordCount: learnedWords.length,
-      personality: personality.tone || "neutral"
+      personality: personality?.tone ? { tone: personality.tone } : { tone: "neutral" }
     });
+
+    const promptWithStyle = `${stylePrompt || ''}\n\n${systemPrompt}`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: systemPrompt },
-
+        { role: "system", content: promptWithStyle },
         { role: "user", content: userMessage }
       ],
       max_tokens: 150,
     });
 
-    return response.choices[0].message?.content || "Sorry, I'm not sure how to respond.";
-  } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "I'm having trouble generating a response right now.";
-  }
+  return response.choices[0].message?.content || "Sorry, I'm not sure how to respond.";
+} catch (error) {
+  console.error("Error generating AI response:", error);
+  return "I'm having trouble generating a response right now.";
+}
 }
 
 
@@ -80,6 +82,11 @@ export function registerRoutes(app: Express): void {
       console.log('Testing OpenAI connection...');
       console.log('API Key present:', !!process.env.OPENAI_API_KEY);
       console.log('API Key format:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+      console.log('Analyzing style profile...');
+
+      const userId = parseInt(req.query.userId as string) || 1; // Default userId to 1 if not provided
+      const { message } = req.query;
+      const stylePrompt = await updateUserStyleAndGetPrompt(userId.toString(), message as string);
       
       // Test with a simple completion
       const response = await openai.chat.completions.create({
@@ -128,7 +135,7 @@ export function registerRoutes(app: Express): void {
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
       console.log('Chat request received:', req.body);
-      const { message, userId = 1 } = req.body;
+      const { message, userId = 1, stylePrompt } = req.body;
 
       if (!message) {
         res.status(400).json({ error: 'message required' });
@@ -157,7 +164,7 @@ export function registerRoutes(app: Express): void {
 
       // Generate AI response
       console.log('Generating AI response...');
-      const aiResponse = await generateResponse(message, bot.id, userId);
+      const aiResponse = await generateResponse(message, bot.id, userId, stylePrompt);
       console.log('AI response generated:', aiResponse);
 
       // Store bot response

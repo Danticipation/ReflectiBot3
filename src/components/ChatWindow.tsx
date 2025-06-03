@@ -1,68 +1,12 @@
-import type { Express, Request, Response } from "express";
-import multer from 'multer';
-import { storage } from "./storage.js";
-import { OpenAI } from "openai";
-import { getReflectibotPrompt } from './utils/promptUtils.js';
-import { analyzeUserMessage } from './utils/personalityUtils.js';
-import { UserStyleProfile } from './utils/styleProfileUtils.js';
+import { useEffect, useRef, useState } from 'react';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { motion } from 'framer-motion';
+import { ScrollArea } from './ui/scroll-area';
 
-import fetch, { Blob } from 'node-fetch';
-import FormData from 'form-data';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-function getStageFromWordCount(wordCount: number): string {
-  if (wordCount < 10) return "Infant";
-  if (wordCount < 25) return "Toddler";
-  if (wordCount < 50) return "Child";
-  if (wordCount < 100) return "Adolescent";
-  return "Adult";
-}
-
-function extractKeywords(text: string): string[] {
-  return text.toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(word => word.length > 2)
-    .slice(0, 10);
-}
-
-async function generateResponse(userMessage: string, botId: number, userId: number, stylePrompt?: string): Promise<string> {
-  try {
-    const memories = await storage.getUserMemories(userId);
-    const facts = await storage.getUserFacts(userId);
-    const learnedWords = await storage.getLearnedWords(botId);
-    const personality = analyzeUserMessage(userMessage);
-    const stage = getStageFromWordCount(learnedWords.length);
-
-    const systemPrompt = getReflectibotPrompt({
-      factContext: facts.map(f => f.fact).join('\n'),
-      memoryContext: memories.map(m => m.memory).join('\n'),
-      stage,
-      learnedWordCount: learnedWords.length,
-      personality: personality?.tone ? { tone: personality.tone } : { tone: "neutral" }
-    });
-
-    const promptWithStyle = `${stylePrompt || ''}\n\n${systemPrompt}`;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: promptWithStyle },
-        { role: "user", content: userMessage }
-      ],
-      max_tokens: 150,
-    });
-
-    return response.choices[0].message?.content || "Sorry, I'm not sure how to respond.";
-  } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "I'm having trouble generating a response right now.";
-  }
+interface Message {
+  sender: 'user' | 'bot';
+  text: string;
 }
 
 export default function ChatWindow() {
@@ -76,7 +20,10 @@ export default function ChatWindow() {
     fetch(`/api/memories/${userId}`)
       .then(res => res.json())
       .then(memories => {
-        const formatted = memories.map((m: any) => ({ sender: 'user', text: m.memory }));
+        const formatted = memories.map((m: any) => ({
+          sender: 'user',
+          text: m.memory
+        }));
         setMessages(formatted);
       });
   }, []);
@@ -87,6 +34,7 @@ export default function ChatWindow() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
     const userMessage: Message = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
@@ -96,13 +44,16 @@ export default function ChatWindow() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage.text, userId })
+        body: JSON.stringify({ message: input, userId })
       });
       const data = await res.json();
       const botMessage: Message = { sender: 'bot', text: data.response };
       setMessages(prev => [...prev, botMessage]);
-    } catch (err) {
-      setMessages(prev => [...prev, { sender: 'bot', text: 'Something went wrong.' }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        sender: 'bot',
+        text: 'Something went wrong.'
+      }]);
     }
 
     setLoading(false);
@@ -125,6 +76,7 @@ export default function ChatWindow() {
         ))}
         <div ref={scrollRef} />
       </ScrollArea>
+
       <div className="flex p-4 gap-2 border-t">
         <Input
           value={input}

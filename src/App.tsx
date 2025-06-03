@@ -1,14 +1,11 @@
-// src/App.tsx
 import React from 'react';
-import AppLayout from './AppLayout';
+import { AppLayout } from './components/AppLayout';
 import ChatWindow from './components/ChatWindow';
 
-function App() {
+export default function App() {
   return (
     <AppLayout>
       <ChatWindow />
     </AppLayout>
   );
 }
-
-export default App;

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { ChatWindow } from './ChatWindow';
+import ChatWindow from './ChatWindow';
 
 export const AppLayout = () => {
   return (
