@@ -12,11 +12,11 @@
     "rootDir": "./",
     "resolveJsonModule": true,
     "declaration": false,
-    "sourceMap": false
-	"baseUrl": "./src",
-"paths": {
-  "@/*": ["*"]
-}
+    "sourceMap": false,
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    }
   },
   "include": [
     "server/**/*",
