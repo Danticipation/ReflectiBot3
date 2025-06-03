@@ -302,14 +302,33 @@ export function registerRoutes(app: Express): void {
   // OpenAI Whisper transcription endpoint
   app.post('/api/transcribe', upload.single('audio'), async (req: Request, res: Response) => {
     try {
+      console.log('Transcription request received');
+      
       if (!req.file) {
+        console.log('No audio file received');
         res.status(400).json({ error: 'Audio file is required' });
         return;
       }
 
+      console.log('Audio file received:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+
+      // Create form data for OpenAI API
       const formData = new FormData();
-      formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), 'audio.webm');
+      
+      // Convert buffer to blob and append to form data
+      const audioBlob = new Blob([req.file.buffer], { 
+        type: req.file.mimetype || 'audio/webm' 
+      });
+      
+      formData.append('file', audioBlob, req.file.originalname || 'audio.webm');
       formData.append('model', 'whisper-1');
+      formData.append('language', 'en'); // Optional: specify language
+
+      console.log('Sending request to OpenAI Whisper API...');
 
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
@@ -319,16 +338,26 @@ export function registerRoutes(app: Express): void {
         body: formData
       });
 
+      console.log('OpenAI API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`OpenAI Whisper API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('OpenAI API error response:', errorText);
+        throw new Error(`OpenAI Whisper API error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('Transcription successful:', result.text);
+      
       res.json({ text: result.text });
 
     } catch (error) {
       console.error('Transcription error:', error);
-      res.status(500).json({ error: 'Transcription failed' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown transcription error';
+      res.status(500).json({ 
+        error: 'Transcription failed',
+        details: errorMessage
+      });
     }
   });
 }
