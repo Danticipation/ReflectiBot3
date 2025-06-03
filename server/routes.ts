@@ -69,6 +69,34 @@ export function registerRoutes(app: Express): void {
     res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
   });
 
+  // Test OpenAI connection
+  app.get('/api/test-openai', async (req: Request, res: Response) => {
+    try {
+      console.log('Testing OpenAI connection...');
+      console.log('API Key present:', !!process.env.OPENAI_API_KEY);
+      console.log('API Key format:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+      
+      // Test with a simple completion
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Say hello" }],
+        max_tokens: 10
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'OpenAI connection working',
+        response: response.choices[0].message?.content 
+      });
+    } catch (error) {
+      console.error('OpenAI test error:', error);
+      res.status(500).json({ 
+        error: 'OpenAI test failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Setup endpoint to create database tables
   app.get('/api/setup', async (req: Request, res: Response) => {
     try {
