@@ -2,6 +2,11 @@ import type { Express, Request, Response } from "express";
 import multer from 'multer';
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
+import { getReflectibotPrompt } from './utils/promptUtils.js';
+
+// Polyfills for fetch, FormData, and Blob in Node.js
+import fetch, { Blob } from 'node-fetch';
+import FormData from 'form-data';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -33,19 +38,15 @@ async function generateResponse(userMessage: string, botId: number, userId: numb
     const memories = await storage.getUserMemories(userId);
     const facts = await storage.getUserFacts(userId);
     const learnedWords = await storage.getLearnedWords(botId);
-    
+
     const stage = getStageFromWordCount(learnedWords.length);
-    const memoryContext = memories.slice(-5).map(m => m.memory).join('\n');
-    const factContext = facts.map(f => f.fact).join('\n');
-    
-    const systemPrompt = `You are Reflectibot, an AI companion in the "${stage}" learning stage.
 
-Your knowledge:
-Facts: ${factContext || 'None yet'}
-Recent memories: ${memoryContext || 'None yet'}
-Words learned: ${learnedWords.length}
-
-Respond naturally according to your developmental stage.`;
+    const systemPrompt = getReflectibotPrompt({
+      factContext: facts.map(f => f.fact).join('\n'),
+      memoryContext: memories.map(m => m.memory).join('\n'),
+      stage,
+      learnedWordCount: learnedWords.length
+    });
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -62,6 +63,7 @@ Respond naturally according to your developmental stage.`;
     return "I'm having trouble generating a response right now.";
   }
 }
+
 
 export function registerRoutes(app: Express): void {
   // Simple test endpoint
@@ -340,19 +342,16 @@ export function registerRoutes(app: Express): void {
 
       console.log('Audio file received:', {
         originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size
       });
 
       // Create form data for OpenAI API
       const formData = new FormData();
       
-      // Convert buffer to blob and append to form data
-      const audioBlob = new Blob([req.file.buffer], { 
-        type: req.file.mimetype || 'audio/webm' 
+      // Append buffer directly as file to form data
+      formData.append('file', req.file.buffer, {
+        filename: req.file.originalname || 'audio.webm',
+        contentType: req.file.mimetype || 'audio/webm'
       });
-      
-      formData.append('file', audioBlob, req.file.originalname || 'audio.webm');
       formData.append('model', 'whisper-1');
       formData.append('language', 'en'); // Optional: specify language
 
@@ -361,7 +360,8 @@ export function registerRoutes(app: Express): void {
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          ...formData.getHeaders()
         },
         body: formData
       });
@@ -374,7 +374,7 @@ export function registerRoutes(app: Express): void {
         throw new Error(`OpenAI Whisper API error: ${response.status} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { text: string };
       console.log('Transcription successful:', result.text);
       
       res.json({ text: result.text });
