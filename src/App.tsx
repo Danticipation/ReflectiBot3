@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
+import WhisperRecorder from './components/WhisperRecorder';
+import MemoryDashboard from './components/MemoryDashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +29,9 @@ const AppComponent = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showMemoryDashboard, setShowMemoryDashboard] = useState(false);
+  const [showUserSwitch, setShowUserSwitch] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
 
   useEffect(() => {
     axios.get('/api/stats?userId=1')
@@ -59,6 +64,13 @@ const AppComponent = () => {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
       
+      // Speak the response
+      try {
+        await axios.post('/api/text-to-speech', { text: res.data.response });
+      } catch (voiceError) {
+        console.log('Voice synthesis unavailable');
+      }
+      
       // Update stats
       setBotStats(prev => prev ? {
         ...prev,
@@ -76,6 +88,28 @@ const AppComponent = () => {
       }]);
     }
     setLoading(false);
+  };
+
+  const switchUser = async () => {
+    if (!newUserName.trim()) return;
+    
+    try {
+      await axios.post('/api/user/switch', { name: newUserName.trim() });
+      setMessages([]);
+      setNewUserName('');
+      setShowUserSwitch(false);
+      
+      // Refresh stats
+      const statsRes = await axios.get('/api/stats?userId=1');
+      setBotStats({
+        level: statsRes.data.stage === 'Infant' ? 1 : statsRes.data.stage === 'Toddler' ? 2 : statsRes.data.stage === 'Child' ? 3 : statsRes.data.stage === 'Adolescent' ? 4 : 5,
+        stage: statsRes.data.stage,
+        wordsLearned: statsRes.data.wordCount
+      });
+      
+    } catch (error) {
+      console.error('User switch failed:', error);
+    }
   };
 
   return (
@@ -116,7 +150,7 @@ const AppComponent = () => {
               </div>
               <h2 className="text-2xl font-bold text-slate-200 mb-3">Welcome to Reflectibot!</h2>
               <p className="text-slate-400 max-w-md mx-auto mb-2">Start a conversation and watch me learn from you.</p>
-              <p className="text-slate-500 text-sm">I'll adapt to your style over time.</p>
+              <p className="text-slate-500 text-sm">I'll speak my responses and adapt to your style over time.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -151,7 +185,7 @@ const AppComponent = () => {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input & Actions */}
       <div className="border-t border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
         <div className="p-6 max-w-6xl mx-auto">
           <div className="flex gap-3 items-end mb-4">
@@ -174,12 +208,81 @@ const AppComponent = () => {
           </div>
           
           <div className="flex justify-between items-center">
+            <div className="flex gap-3">
+              <WhisperRecorder 
+                onTranscription={(text) => setInput(text)} 
+                onResponse={() => {}} 
+              />
+              <button 
+                onClick={() => setShowMemoryDashboard(!showMemoryDashboard)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                🧠 Memory
+              </button>
+              <button 
+                onClick={() => setShowUserSwitch(!showUserSwitch)}
+                className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+              >
+                👤 Switch User
+              </button>
+            </div>
             <div className="text-xs text-slate-500">
               Press Enter to send
             </div>
           </div>
         </div>
       </div>
+
+      {/* Memory Dashboard Modal */}
+      {showMemoryDashboard && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-200">Memory Dashboard</h3>
+              <button 
+                onClick={() => setShowMemoryDashboard(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <MemoryDashboard userId={1} />
+          </div>
+        </div>
+      )}
+
+      {/* User Switch Modal */}
+      {showUserSwitch && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-purple-400 mb-4">Switch User Identity</h3>
+            <p className="text-slate-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newUserName}
+                onChange={(e) => setNewUserName(e.target.value)}
+                placeholder="Enter new user name"
+                className="flex-1 bg-slate-700/80 border border-slate-600/50 rounded-lg px-3 py-2 text-white placeholder-slate-400"
+                onKeyPress={(e) => e.key === 'Enter' && switchUser()}
+              />
+              <button 
+                onClick={switchUser}
+                disabled={!newUserName.trim()}
+                className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg"
+              >
+                Switch
+              </button>
+              <button 
+                onClick={() => setShowUserSwitch(false)}
+                className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
