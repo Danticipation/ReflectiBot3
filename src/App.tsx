@@ -84,6 +84,7 @@ const AppComponent = () => {
       utterance.onend = () => resolve();
       utterance.onerror = (event) => reject(new Error(`Speech synthesis failed: ${event.error}`));
       
+      window.speechSynthesis.cancel(); // Stop any ongoing speech before starting new
       speechSynthesis.speak(utterance);
     });
   };
@@ -352,7 +353,7 @@ const AppComponent = () => {
 
       {/* Memory Dashboard Modal */}
       {showMemoryDashboard && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div key="memory-dashboard-modal" className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-200">Memory Dashboard</h3>
@@ -370,7 +371,7 @@ const AppComponent = () => {
 
       {/* User Switch Modal */}
       {showUserSwitch && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div key="user-switch-modal" className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-md w-full">
             <h3 className="text-xl font-bold text-purple-400 mb-4">Switch User Identity</h3>
             <p className="text-slate-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
@@ -381,7 +382,7 @@ const AppComponent = () => {
                 onChange={(e) => setNewUserName(e.target.value)}
                 placeholder="Enter new user name"
                 className="flex-1 bg-slate-700/80 border border-slate-600/50 rounded-lg px-3 py-2 text-white placeholder-slate-400"
-                onKeyPress={(e) => e.key === 'Enter' && switchUser()}
+                onKeyDown={(e) => e.key === 'Enter' && switchUser()}
               />
               <button 
                 onClick={switchUser}
