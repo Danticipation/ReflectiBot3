@@ -33,6 +33,76 @@ const AppComponent = () => {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 
+  // Define TTS functions inline to avoid import path issues
+  const speakWithElevenLabs = async (text: string): Promise<void> => {
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS API failed with status: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      return new Promise((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          resolve();
+        };
+        
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          reject(new Error('Audio playback failed'));
+        };
+        
+        audio.play().catch(reject);
+      });
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      throw error;
+    }
+  };
+
+  const speakWithBrowserTTS = (text: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!('speechSynthesis' in window)) {
+        reject(new Error('Browser speech synthesis not supported'));
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.8;
+      
+      utterance.onend = () => resolve();
+      utterance.onerror = (event) => reject(new Error(`Speech synthesis failed: ${event.error}`));
+      
+      speechSynthesis.speak(utterance);
+    });
+  };
+
+  // Test TTS function for debugging
+  const testBrowserTTS = () => {
+    console.log('Testing browser TTS...');
+    const utterance = new SpeechSynthesisUtterance("Hello! This is a test of the text to speech system.");
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+    
+    utterance.onstart = () => console.log('TTS started');
+    utterance.onend = () => console.log('TTS ended');
+    utterance.onerror = (e) => console.error('TTS error:', e);
+    
+    speechSynthesis.speak(utterance);
+  };
+
   useEffect(() => {
     axios.get('/api/stats?userId=1')
       .then(res => {
@@ -58,17 +128,57 @@ const AppComponent = () => {
     
     try {
       const res = await axios.post('/api/chat', { message: newMessage.text, userId: 1 });
-      setMessages(prev => [...prev, {
-        sender: 'bot',
+      const botResponse = {
+        sender: 'bot' as const,
         text: res.data.response,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+      };
+      setMessages(prev => [...prev, botResponse]);
       
-      // Speak the response
+      // Speak the response with multiple fallback methods
+      console.log('Attempting to speak bot response:', res.data.response);
+      
       try {
-        await axios.post('/api/text-to-speech', { text: res.data.response });
-      } catch (voiceError) {
-        console.log('Voice synthesis unavailable');
+        // Method 1: Try ElevenLabs first
+        console.log('Trying ElevenLabs TTS...');
+        await speakWithElevenLabs(res.data.response);
+        console.log('ElevenLabs TTS successful');
+      } catch (elevenLabsError) {
+        console.log('ElevenLabs TTS failed, trying browser TTS:', elevenLabsError);
+        
+        try {
+          // Method 2: Fallback to browser TTS
+          await speakWithBrowserTTS(res.data.response);
+          console.log('Browser TTS successful');
+        } catch (browserTTSError) {
+          console.log('Browser TTS failed, trying direct API:', browserTTSError);
+          
+          try {
+            // Method 3: Direct API call as final fallback
+            const ttsResponse = await axios.post('/api/tts', { text: res.data.response }, {
+              responseType: 'blob'
+            });
+            
+            const audioBlob = new Blob([ttsResponse.data], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.onended = () => {
+              URL.revokeObjectURL(audioUrl);
+              console.log('Direct API TTS completed');
+            };
+            
+            audio.onerror = (e) => {
+              console.error('Audio playback error:', e);
+              URL.revokeObjectURL(audioUrl);
+            };
+            
+            await audio.play();
+            console.log('Direct API TTS successful');
+          } catch (directAPIError) {
+            console.error('All TTS methods failed:', directAPIError);
+          }
+        }
       }
       
       // Update stats
@@ -208,7 +318,7 @@ const AppComponent = () => {
           </div>
           
           <div className="flex justify-between items-center">
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <WhisperRecorder 
                 onTranscription={(text) => setInput(text)} 
                 onResponse={() => {}} 
@@ -224,6 +334,13 @@ const AppComponent = () => {
                 className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
               >
                 👤 Switch User
+              </button>
+              <button 
+                onClick={testBrowserTTS}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
+                title="Test if TTS is working"
+              >
+                🔊 Test TTS
               </button>
             </div>
             <div className="text-xs text-slate-500">
