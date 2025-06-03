@@ -1,10 +1,14 @@
 import type { Express, Request, Response } from "express";
+import multer from 'multer';
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Set up multer for file uploads
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Learning stage tracker
 function getStageFromWordCount(wordCount: number): string {
@@ -242,21 +246,86 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Text-to-speech placeholder
-  app.post('/api/text-to-speech', async (req: Request, res: Response) => {
-    // Placeholder - implement with your TTS service
-    res.json({ status: 'TTS not implemented yet' });
+  // ElevenLabs Text-to-Speech endpoint
+  app.post('/api/tts', async (req: Request, res: Response) => {
+    try {
+      const { text, voiceId = 'iCrDUkL56s3C8sCRl7wb' } = req.body; // Default to Hope voice
+      
+      if (!text) {
+        res.status(400).json({ error: 'Text is required' });
+        return;
+      }
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': process.env.ELEVENLABS_API_KEY || ''
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status}`);
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength.toString()
+      });
+      
+      res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+      console.error('TTS error:', error);
+      res.status(500).json({ error: 'Text-to-speech failed' });
+    }
   });
 
-  // Transcribe endpoint (for voice recording)
-  app.post('/api/transcribe', async (req: Request, res: Response) => {
+  // Text-to-speech alias endpoint (for backward compatibility)
+  app.post('/api/text-to-speech', async (req: Request, res: Response) => {
+    // Redirect to the main TTS endpoint
+    req.url = '/api/tts';
+    app._router.handle(req, res);
+  });
+
+  // OpenAI Whisper transcription endpoint
+  app.post('/api/transcribe', upload.single('audio'), async (req: Request, res: Response) => {
     try {
-      // For now, return a placeholder since we don't have OpenAI Whisper set up
-      // In a full implementation, you'd use OpenAI's Whisper API or another transcription service
-      res.json({ 
-        text: 'Voice transcription received! (OpenAI Whisper not configured yet)',
-        status: 'placeholder' 
+      if (!req.file) {
+        res.status(400).json({ error: 'Audio file is required' });
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), 'audio.webm');
+      formData.append('model', 'whisper-1');
+
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: formData
       });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI Whisper API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      res.json({ text: result.text });
+
     } catch (error) {
       console.error('Transcription error:', error);
       res.status(500).json({ error: 'Transcription failed' });
