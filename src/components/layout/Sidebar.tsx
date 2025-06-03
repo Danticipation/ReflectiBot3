@@ -1,10 +1,11 @@
 import React from 'react';
 
-export default function Sidebar() {
+const Sidebar = () => {
   return (
-    <div className="w-64 bg-zinc-800 p-4">
-      <h2 className="text-xl font-semibold">Sidebar</h2>
-      {/* Sidebar content */}
-    </div>
+    <aside className="w-64 bg-zinc-800 p-4">
+      <p>Sidebar content here</p>
+    </aside>
   );
-}
+};
+
+export default Sidebar;
