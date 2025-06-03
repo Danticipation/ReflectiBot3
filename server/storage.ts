@@ -37,6 +37,99 @@ ensureTables();
 
 // Storage interface for database operations
 export const storage = {
+  // Setup tables method
+  async setupTables(): Promise<void> {
+    const createUsersTable = `
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) NOT NULL UNIQUE,
+        email VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createBotsTable = `
+      CREATE TABLE IF NOT EXISTS bots (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        name VARCHAR(100) NOT NULL,
+        level INTEGER DEFAULT 1 NOT NULL,
+        words_learned INTEGER DEFAULT 0 NOT NULL,
+        personality_traits JSONB,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createMessagesTable = `
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        bot_id INTEGER REFERENCES bots(id),
+        sender VARCHAR(20) NOT NULL,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createLearnedWordsTable = `
+      CREATE TABLE IF NOT EXISTS learned_words (
+        id SERIAL PRIMARY KEY,
+        bot_id INTEGER REFERENCES bots(id),
+        word VARCHAR(100) NOT NULL,
+        frequency INTEGER DEFAULT 1 NOT NULL,
+        context TEXT,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createMilestonesTable = `
+      CREATE TABLE IF NOT EXISTS milestones (
+        id SERIAL PRIMARY KEY,
+        bot_id INTEGER REFERENCES bots(id),
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        achieved_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createUserMemoriesTable = `
+      CREATE TABLE IF NOT EXISTS user_memories (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        memory TEXT NOT NULL,
+        category VARCHAR(50) DEFAULT 'conversation' NOT NULL,
+        importance VARCHAR(20) DEFAULT 'medium' NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const createUserFactsTable = `
+      CREATE TABLE IF NOT EXISTS user_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        fact TEXT NOT NULL,
+        category VARCHAR(50) DEFAULT 'general' NOT NULL,
+        confidence VARCHAR(20) DEFAULT 'medium' NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
+    const insertDefaultUser = `
+      INSERT INTO users (username, email) VALUES ('default_user', 'user@example.com') 
+      ON CONFLICT (username) DO NOTHING
+    `;
+
+    // Execute all table creation queries
+    await sql(createUsersTable);
+    await sql(createBotsTable);
+    await sql(createMessagesTable);
+    await sql(createLearnedWordsTable);
+    await sql(createMilestonesTable);
+    await sql(createUserMemoriesTable);
+    await sql(createUserFactsTable);
+    await sql(insertDefaultUser);
+  },
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     const results = await db.select().from(users).where(eq(users.id, id));
