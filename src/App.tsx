@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
-import WhisperRecorder from './components/WhisperRecorder';
+import { Topbar } from './components/Topbar';
+import { Sidebar } from './components/Sidebar';
+import { ChatWindow } from './components/ChatWindow';
 import MemoryDashboard from './components/MemoryDashboard';
+import VoiceSelector from './components/VoiceSelector';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,13 +30,84 @@ interface Message {
 const AppComponent = () => {
   const [botStats, setBotStats] = useState<BotStats | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showMemoryDashboard, setShowMemoryDashboard] = useState(false);
-  const [showUserSwitch, setShowUserSwitch] = useState(false);
+  const [activeSection, setActiveSection] = useState('chat');
+  const [weeklySummary, setWeeklySummary] = useState<string>('');
   const [newUserName, setNewUserName] = useState('');
 
+  // Define TTS functions inline to avoid import path issues
+  const speakWithElevenLabs = async (text: string): Promise<void> => {
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS API failed with status: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      return new Promise((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          resolve();
+        };
+        
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          reject(new Error('Audio playback failed'));
+        };
+        
+        audio.play().catch(reject);
+      });
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      throw error;
+    }
+  };
+
+  const speakWithBrowserTTS = (text: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!('speechSynthesis' in window)) {
+        reject(new Error('Browser speech synthesis not supported'));
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.8;
+      
+      utterance.onend = () => resolve();
+      utterance.onerror = (event) => reject(new Error(`Speech synthesis failed: ${event.error}`));
+      
+      window.speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    });
+  };
+
+  // Test TTS function for debugging
+  const testBrowserTTS = () => {
+    console.log('Testing browser TTS...');
+    const utterance = new SpeechSynthesisUtterance("Hello! This is a test of the text to speech system.");
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+    
+    utterance.onstart = () => console.log('TTS started');
+    utterance.onend = () => console.log('TTS ended');
+    utterance.onerror = (e) => console.error('TTS error:', e);
+    
+    speechSynthesis.speak(utterance);
+  };
+
   useEffect(() => {
+    // Load bot stats
     axios.get('/api/stats?userId=1')
       .then(res => {
         setBotStats({
@@ -43,32 +117,49 @@ const AppComponent = () => {
         });
       })
       .catch(() => setBotStats({ level: 1, stage: 'Infant', wordsLearned: 0 }));
+
+    // Load weekly summary
+    axios.get('/api/weekly-summary?userId=1')
+      .then(res => setWeeklySummary(res.data.summary))
+      .catch(() => setWeeklySummary('No reflections available yet.'));
   }, []);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (messageText: string) => {
     const newMessage: Message = {
       sender: 'user',
-      text: input,
+      text: messageText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, newMessage]);
-    setInput('');
     setLoading(true);
     
     try {
-      const res = await axios.post('/api/chat', { message: newMessage.text, userId: 1 });
-      setMessages(prev => [...prev, {
-        sender: 'bot',
+      const res = await axios.post('/api/chat', { message: messageText, userId: 1 });
+      const botResponse = {
+        sender: 'bot' as const,
         text: res.data.response,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+      };
+      setMessages(prev => [...prev, botResponse]);
       
-      // Speak the response
+      // Speak the response with multiple fallback methods
+      console.log('Attempting to speak bot response:', res.data.response);
+      
       try {
-        await axios.post('/api/text-to-speech', { text: res.data.response });
-      } catch (voiceError) {
-        console.log('Voice synthesis unavailable');
+        // Method 1: Try ElevenLabs first
+        console.log('Trying ElevenLabs TTS...');
+        await speakWithElevenLabs(res.data.response);
+        console.log('ElevenLabs TTS successful');
+      } catch (elevenLabsError) {
+        console.log('ElevenLabs TTS failed, trying browser TTS:', elevenLabsError);
+        
+        try {
+          // Method 2: Fallback to browser TTS
+          await speakWithBrowserTTS(res.data.response);
+          console.log('Browser TTS successful');
+        } catch (browserTTSError) {
+          console.log('Browser TTS failed:', browserTTSError);
+        }
       }
       
       // Update stats
@@ -97,7 +188,7 @@ const AppComponent = () => {
       await axios.post('/api/user/switch', { name: newUserName.trim() });
       setMessages([]);
       setNewUserName('');
-      setShowUserSwitch(false);
+      setActiveSection('chat');
       
       // Refresh stats
       const statsRes = await axios.get('/api/stats?userId=1');
@@ -112,177 +203,108 @@ const AppComponent = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white font-sans flex flex-col">
-      {/* Header */}
-      <div className="p-6 bg-gradient-to-r from-slate-800/80 to-gray-800/80 backdrop-blur-sm shadow-lg border-b border-slate-700/50">
-        <div className="flex justify-between items-center max-w-6xl mx-auto">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent">
-              Reflectibot
-            </h1>
-            <p className="text-slate-400 text-sm font-medium">Your evolving AI companion</p>
-          </div>
-          {botStats && (
-            <div className="text-right">
-              <div className="flex gap-4">
-                <div className="bg-slate-800/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-600/50 shadow-lg">
-                  <div className="text-emerald-400 font-bold text-lg">Level {botStats.level}</div>
-                  <div className="text-slate-400 text-xs font-medium">{botStats.stage}</div>
-                </div>
-                <div className="bg-slate-800/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-600/50 shadow-lg">
-                  <div className="text-blue-400 font-bold text-lg">{botStats.wordsLearned}</div>
-                  <div className="text-slate-400 text-xs font-medium">words learned</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chat History */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto">
-          {messages.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
-                <div className="text-4xl">🤖</div>
-              </div>
-              <h2 className="text-2xl font-bold text-slate-200 mb-3">Welcome to Reflectibot!</h2>
-              <p className="text-slate-400 max-w-md mx-auto mb-2">Start a conversation and watch me learn from you.</p>
-              <p className="text-slate-500 text-sm">I'll speak my responses and adapt to your style over time.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`rounded-2xl p-4 max-w-lg shadow-lg ${
-                    msg.sender === 'user' 
-                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white' 
-                      : 'bg-slate-800/80 backdrop-blur-sm border border-slate-700/50'
-                  }`}>
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
-                    <p className="text-xs opacity-60 mt-2">{msg.time}</p>
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 shadow-lg">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Input & Actions */}
-      <div className="border-t border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
-        <div className="p-6 max-w-6xl mx-auto">
-          <div className="flex gap-3 items-end mb-4">
-            <input
-              type="text"
-              placeholder="Share your thoughts..."
-              className="flex-1 bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              disabled={loading}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim()}
-              className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-lg"
-            >
-              {loading ? 'Sending...' : 'Send'}
-            </button>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <div className="flex gap-3">
-              <WhisperRecorder 
-                onTranscription={(text) => setInput(text)} 
-                onResponse={() => {}} 
-              />
-              <button 
-                onClick={() => setShowMemoryDashboard(!showMemoryDashboard)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                🧠 Memory
-              </button>
-              <button 
-                onClick={() => setShowUserSwitch(!showUserSwitch)}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-all shadow-md"
-              >
-                👤 Switch User
-              </button>
-            </div>
-            <div className="text-xs text-slate-500">
-              Press Enter to send
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Memory Dashboard Modal */}
-      {showMemoryDashboard && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-200">Memory Dashboard</h3>
-              <button 
-                onClick={() => setShowMemoryDashboard(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
+  const renderMainContent = () => {
+    switch (activeSection) {
+      case 'chat':
+        return (
+          <ChatWindow 
+            messages={messages}
+            onSendMessage={sendMessage}
+            loading={loading}
+          />
+        );
+      
+      case 'memory':
+        return (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-zinc-200 mb-2">🧠 Memory Dashboard</h2>
+              <p className="text-zinc-400">Track your AI companion's learning progress and memories.</p>
             </div>
             <MemoryDashboard userId={1} />
           </div>
-        </div>
-      )}
-
-      {/* User Switch Modal */}
-      {showUserSwitch && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-purple-400 mb-4">Switch User Identity</h3>
-            <p className="text-slate-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newUserName}
-                onChange={(e) => setNewUserName(e.target.value)}
-                placeholder="Enter new user name"
-                className="flex-1 bg-slate-700/80 border border-slate-600/50 rounded-lg px-3 py-2 text-white placeholder-slate-400"
-                onKeyPress={(e) => e.key === 'Enter' && switchUser()}
-              />
-              <button 
-                onClick={switchUser}
-                disabled={!newUserName.trim()}
-                className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg"
-              >
-                Switch
-              </button>
-              <button 
-                onClick={() => setShowUserSwitch(false)}
-                className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg"
-              >
-                Cancel
-              </button>
+        );
+      
+      case 'reflection':
+        return (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-zinc-200 mb-2">📘 Weekly Reflection</h2>
+              <p className="text-zinc-400">AI-generated insights from your conversations.</p>
+            </div>
+            <div className="bg-zinc-800 rounded-xl p-6 border border-zinc-700">
+              <p className="text-zinc-300 leading-relaxed">
+                {weeklySummary || "No reflection data available yet. Keep chatting to build up conversation history for weekly insights!"}
+              </p>
             </div>
           </div>
-        </div>
-      )}
+        );
+      
+      case 'voice':
+        return (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-zinc-200 mb-2">🎤 Voice Settings</h2>
+              <p className="text-zinc-400">Configure how your AI companion speaks to you.</p>
+            </div>
+            <VoiceSelector 
+              userId={1} 
+              onVoiceChange={(voice) => {
+                console.log('Voice changed to:', voice.name);
+              }}
+            />
+          </div>
+        );
+      
+      case 'user':
+        return (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-zinc-200 mb-2">👤 User Management</h2>
+              <p className="text-zinc-400">Switch user identity or manage account settings.</p>
+            </div>
+            <div className="bg-zinc-800 rounded-xl p-6 border border-zinc-700">
+              <h3 className="text-lg font-semibold text-amber-400 mb-4">Switch User Identity</h3>
+              <p className="text-zinc-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="Enter new user name"
+                  className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-white placeholder-zinc-400"
+                  onKeyDown={(e) => e.key === 'Enter' && switchUser()}
+                />
+                <button 
+                  onClick={switchUser}
+                  disabled={!newUserName.trim()}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-600 text-white px-6 py-2 rounded-lg font-medium transition-all"
+                >
+                  Switch
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      
+      default:
+        return <ChatWindow messages={messages} onSendMessage={sendMessage} loading={loading} />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-zinc-900 text-zinc-100">
+      <Sidebar 
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        onTestTTS={testBrowserTTS}
+      />
+      <div className="flex flex-col flex-1">
+        <Topbar botStats={botStats} />
+        <main className="flex-1 overflow-hidden">
+          {renderMainContent()}
+        </main>
+      </div>
     </div>
   );
 };

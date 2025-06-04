@@ -5,27 +5,41 @@ import {
   type User, type InsertUser, type Bot, type InsertBot, type Message, type InsertMessage,
   type LearnedWord, type InsertLearnedWord, type Milestone, type InsertMilestone,
   type UserMemory, type InsertUserMemory, type UserFact, type InsertUserFact
-} from '../shared/schema.js';
+} from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 // Initialize database connection
 const connectionString = process.env.DATABASE_URL;
-
 if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is not set');
+  console.warn("DATABASE_URL not set, using fallback storage");
+  // You can add fallback logic here or just continue
 }
 
 // Create the neon client
-const sql = neon(connectionString);
+let sql;
+if (connectionString) {
+sql = neon(connectionString);
+} else {
+  console.error("Cannot create Neon client: DATABASE_URL is not set.");
+  throw new Error("DATABASE_URL is required to initialize the database connection.");
+}
 
-// Initialize drizzle
+  // Initialize drizzle
 const db = drizzle(sql);
 
 // Simple table creation (for initial setup)
 async function ensureTables() {
   try {
     // Try to query users table, if it fails, tables don't exist
-    await db.select().from(users).limit(1);
+    await db.select().from(users).limit(1).execute();
+  } catch (error) {
+    console.log('Tables do not exist. You need to run database migrations.');
+    // You could add table creation SQL here, but for now just log the error
+  }
+}
+  try {
+    // Try to query users table, if it fails, tables don't exist
+ensureTables(); // Ensure tables are checked on module load
   } catch (error) {
     console.log('Tables do not exist. You need to run database migrations.');
     // You could add table creation SQL here, but for now just log the error
@@ -33,7 +47,7 @@ async function ensureTables() {
 }
 
 // Call it once when the module loads
-ensureTables();
+// ensureTables(); // Comment this out temporarily
 
 // Storage interface for database operations
 export const storage = {
@@ -133,38 +147,38 @@ export const storage = {
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     const results = await db.select().from(users).where(eq(users.id, id));
-    return results[0];
+    return results[0] as User | undefined;
   },
 
   async createUser(data: InsertUser): Promise<User> {
     const results = await db.insert(users).values(data).returning();
-    return results[0];
+    return results[0] as User;
   },
 
   // Bot operations
   async getBot(id: number): Promise<Bot | undefined> {
     const results = await db.select().from(bots).where(eq(bots.id, id));
-    return results[0];
+    return results[0] as Bot;
   },
 
   async getBotByUserId(userId: number): Promise<Bot | undefined> {
     const results = await db.select().from(bots).where(eq(bots.userId, userId));
-    return results[0];
+    return results[0] as Bot | undefined;
   },
 
   async createBot(data: InsertBot): Promise<Bot> {
     const results = await db.insert(bots).values(data).returning();
-    return results[0];
+    return results[0] as Bot;
   },
 
   async updateBot(id: number, data: Partial<InsertBot>): Promise<Bot> {
     const results = await db.update(bots).set(data).where(eq(bots.id, id)).returning();
-    return results[0];
+    return results[0] as Bot;
   },
 
   // Message operations
   async getMessages(botId: number): Promise<Message[]> {
-    return await db.select().from(messages).where(eq(messages.botId, botId)).orderBy(messages.createdAt);
+    return await db.select().from(messages).where(eq(messages.botId, botId)).orderBy(messages.createdAt) as unknown as Message[];
   },
 
   async createMessage(data: InsertMessage): Promise<Message> {
