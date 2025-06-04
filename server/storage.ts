@@ -11,20 +11,14 @@ import { eq, and } from 'drizzle-orm';
 // Initialize database connection
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.warn("DATABASE_URL not set, using fallback storage");
-  // You can add fallback logic here or just continue
-}
-
-// Create the neon client
-let sql;
-if (connectionString) {
-sql = neon(connectionString);
-} else {
-  console.error("Cannot create Neon client: DATABASE_URL is not set.");
+  console.error("DATABASE_URL not set, cannot initialize storage.");
   throw new Error("DATABASE_URL is required to initialize the database connection.");
 }
 
-  // Initialize drizzle
+// Create the neon client
+const sql = neon(connectionString);
+
+// Initialize drizzle
 const db = drizzle(sql);
 
 // Simple table creation (for initial setup)
@@ -37,14 +31,7 @@ async function ensureTables() {
     // You could add table creation SQL here, but for now just log the error
   }
 }
-  try {
-    // Try to query users table, if it fails, tables don't exist
 ensureTables(); // Ensure tables are checked on module load
-  } catch (error) {
-    console.log('Tables do not exist. You need to run database migrations.');
-    // You could add table creation SQL here, but for now just log the error
-  }
-}
 
 // Call it once when the module loads
 // ensureTables(); // Comment this out temporarily
@@ -240,8 +227,8 @@ export const storage = {
     return await db.select().from(userFacts).where(eq(userFacts.userId, userId));
   },
 
-  async createUserFact(data: InsertUserFact): Promise<UserFact> {
-    const results = await db.insert(userFacts).values(data).returning();
-    return results[0];
-  }
-};
+    async createUserFact(data: InsertUserFact): Promise<UserFact> {
+      const results = await db.insert(userFacts).values(data).returning();
+      return results[0];
+    }
+  };
