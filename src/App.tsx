@@ -1,320 +1,318 @@
-import React, { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import axios from 'axios';
-import { Topbar } from './components/Topbar';
-import { Sidebar } from './components/Sidebar';
-import { ChatWindow } from './components/ChatWindow';
-import MemoryDashboard from './components/MemoryDashboard';
-import VoiceSelector from './components/VoiceSelector';
+import React, { useState, useRef } from 'react';
+import { MessageCircle, Brain, BookOpen, Mic, User, Square } from 'lucide-react';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-interface BotStats {
-  level: number;
-  stage: string;
-  wordsLearned: number;
-}
-
-interface Message {
-  sender: 'user' | 'bot';
-  text: string;
-  time: string;
-}
-
-const AppComponent = () => {
-  const [botStats, setBotStats] = useState<BotStats | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
+const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState('chat');
-  const [weeklySummary, setWeeklySummary] = useState<string>('');
-  const [newUserName, setNewUserName] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [messages, setMessages] = useState<Array<{id: string, text: string, sender: 'user' | 'ai'}>>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  // Define TTS functions inline to avoid import path issues
-  const speakWithElevenLabs = async (text: string): Promise<void> => {
+  const sections = [
+    { id: 'chat', icon: MessageCircle, label: 'Chat', emoji: '💬' },
+    { id: 'insights', icon: Brain, label: 'Insights', emoji: '🧠' },
+    { id: 'knowledge', icon: BookOpen, label: 'Knowledge', emoji: '📘' },
+    { id: 'voice', icon: Mic, label: 'Voice', emoji: '🎤' },
+    { id: 'profile', icon: User, label: 'Profile', emoji: '👤' }
+  ];
+
+  const startRecording = async () => {
     try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
 
-      if (!response.ok) {
-        throw new Error(`TTS API failed with status: ${response.status}`);
-      }
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      return new Promise((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          resolve();
-        };
+      mediaRecorder.onstop = () => {
+        // Mock transcription for demo
+        const mockTranscript = `Voice recording completed at ${new Date().toLocaleTimeString()}`;
+        setTranscript(mockTranscript);
+        addMessage(mockTranscript, 'user');
         
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          reject(new Error('Audio playback failed'));
-        };
+        // Auto-respond as AI
+        setTimeout(() => {
+          addMessage("I heard your voice message! This is a demo response since we don't have a server running yet.", 'ai');
+        }, 1000);
         
-        audio.play().catch(reject);
-      });
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
     } catch (error) {
-      console.error('Text-to-speech error:', error);
-      throw error;
+      console.error('Error starting recording:', error);
+      alert('Could not access microphone. Please check permissions.');
     }
   };
 
-  const speakWithBrowserTTS = (text: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (!('speechSynthesis' in window)) {
-        reject(new Error('Browser speech synthesis not supported'));
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.8;
-      
-      utterance.onend = () => resolve();
-      utterance.onerror = (event) => reject(new Error(`Speech synthesis failed: ${event.error}`));
-      
-      window.speechSynthesis.cancel();
-      speechSynthesis.speak(utterance);
-    });
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
   };
 
-  // Test TTS function for debugging
-  const testBrowserTTS = () => {
-    console.log('Testing browser TTS...');
-    const utterance = new SpeechSynthesisUtterance("Hello! This is a test of the text to speech system.");
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.8;
-    
-    utterance.onstart = () => console.log('TTS started');
-    utterance.onend = () => console.log('TTS ended');
-    utterance.onerror = (e) => console.error('TTS error:', e);
-    
-    speechSynthesis.speak(utterance);
-  };
-
-  useEffect(() => {
-    // Load bot stats
-    axios.get('/api/stats?userId=1')
-      .then(res => {
-        setBotStats({
-          level: res.data.stage === 'Infant' ? 1 : res.data.stage === 'Toddler' ? 2 : res.data.stage === 'Child' ? 3 : res.data.stage === 'Adolescent' ? 4 : 5,
-          stage: res.data.stage,
-          wordsLearned: res.data.wordCount
-        });
-      })
-      .catch(() => setBotStats({ level: 1, stage: 'Infant', wordsLearned: 0 }));
-
-    // Load weekly summary
-    axios.get('/api/weekly-summary?userId=1')
-      .then(res => setWeeklySummary(res.data.summary))
-      .catch(() => setWeeklySummary('No reflections available yet.'));
-  }, []);
-
-  const sendMessage = async (messageText: string) => {
-    const newMessage: Message = {
-      sender: 'user',
-      text: messageText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const addMessage = (text: string, sender: 'user' | 'ai') => {
+    const newMessage = {
+      id: Date.now().toString() + Math.random(),
+      text,
+      sender
     };
     setMessages(prev => [...prev, newMessage]);
-    setLoading(true);
-    
-    try {
-      const res = await axios.post('/api/chat', { message: messageText, userId: 1 });
-      const botResponse = {
-        sender: 'bot' as const,
-        text: res.data.response,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, botResponse]);
-      
-      // Speak the response with multiple fallback methods
-      console.log('Attempting to speak bot response:', res.data.response);
-      
-      try {
-        // Method 1: Try ElevenLabs first
-        console.log('Trying ElevenLabs TTS...');
-        await speakWithElevenLabs(res.data.response);
-        console.log('ElevenLabs TTS successful');
-      } catch (elevenLabsError) {
-        console.log('ElevenLabs TTS failed, trying browser TTS:', elevenLabsError);
-        
-        try {
-          // Method 2: Fallback to browser TTS
-          await speakWithBrowserTTS(res.data.response);
-          console.log('Browser TTS successful');
-        } catch (browserTTSError) {
-          console.log('Browser TTS failed:', browserTTSError);
-        }
-      }
-      
-      // Update stats
-      setBotStats(prev => prev ? {
-        ...prev,
-        wordsLearned: res.data.wordsLearned || prev.wordsLearned,
-        stage: res.data.stage || prev.stage,
-        level: res.data.stage === 'Infant' ? 1 : res.data.stage === 'Toddler' ? 2 : res.data.stage === 'Child' ? 3 : res.data.stage === 'Adolescent' ? 4 : 5
-      } : null);
-      
-    } catch (err) {
-      console.error('Chat failed', err);
-      setMessages(prev => [...prev, {
-        sender: 'bot',
-        text: 'Sorry, I encountered an error. Please try again.',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
-    }
-    setLoading(false);
   };
 
-  const switchUser = async () => {
-    if (!newUserName.trim()) return;
-    
-    try {
-      await axios.post('/api/user/switch', { name: newUserName.trim() });
-      setMessages([]);
-      setNewUserName('');
-      setActiveSection('chat');
+  const sendMessage = (text: string) => {
+    if (text.trim()) {
+      addMessage(text, 'user');
       
-      // Refresh stats
-      const statsRes = await axios.get('/api/stats?userId=1');
-      setBotStats({
-        level: statsRes.data.stage === 'Infant' ? 1 : statsRes.data.stage === 'Toddler' ? 2 : statsRes.data.stage === 'Child' ? 3 : statsRes.data.stage === 'Adolescent' ? 4 : 5,
-        stage: statsRes.data.stage,
-        wordsLearned: statsRes.data.wordCount
-      });
-      
-    } catch (error) {
-      console.error('User switch failed:', error);
+      // Mock AI response
+      setTimeout(() => {
+        const responses = [
+          "That's interesting! Tell me more about that.",
+          "I understand. How does that make you feel?",
+          "Thanks for sharing that with me.",
+          "That's a great point. What else would you like to discuss?",
+          "I'm here to listen and help you reflect on your thoughts."
+        ];
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        addMessage(randomResponse, 'ai');
+      }, 1000);
     }
   };
 
-  const renderMainContent = () => {
+  const renderContent = () => {
     switch (activeSection) {
       case 'chat':
         return (
-          <ChatWindow 
-            messages={messages}
-            onSendMessage={sendMessage}
-            loading={loading}
-          />
-        );
-      
-      case 'memory':
-        return (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-zinc-200 mb-2">🧠 Memory Dashboard</h2>
-              <p className="text-zinc-400">Track your AI companion's learning progress and memories.</p>
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.length === 0 ? (
+                <div className="text-center text-zinc-400 mt-20">
+                  <MessageCircle className="w-16 h-16 mx-auto mb-4 text-zinc-600" />
+                  <h3 className="text-xl font-semibold mb-2">Start a conversation</h3>
+                  <p>Ask me anything or use voice recording to get started!</p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-sm px-4 py-2 rounded-lg ${
+                        message.sender === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-zinc-700 text-zinc-100'
+                      }`}
+                    >
+                      {message.text}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-            <MemoryDashboard userId={1} />
-          </div>
-        );
-      
-      case 'reflection':
-        return (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-zinc-200 mb-2">📘 Weekly Reflection</h2>
-              <p className="text-zinc-400">AI-generated insights from your conversations.</p>
-            </div>
-            <div className="bg-zinc-800 rounded-xl p-6 border border-zinc-700">
-              <p className="text-zinc-300 leading-relaxed">
-                {weeklySummary || "No reflection data available yet. Keep chatting to build up conversation history for weekly insights!"}
-              </p>
-            </div>
-          </div>
-        );
-      
-      case 'voice':
-        return (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-zinc-200 mb-2">🎤 Voice Settings</h2>
-              <p className="text-zinc-400">Configure how your AI companion speaks to you.</p>
-            </div>
-            <VoiceSelector 
-              userId={1} 
-              onVoiceChange={(voice) => {
-                console.log('Voice changed to:', voice.name);
-              }}
-            />
-          </div>
-        );
-      
-      case 'user':
-        return (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-zinc-200 mb-2">👤 User Management</h2>
-              <p className="text-zinc-400">Switch user identity or manage account settings.</p>
-            </div>
-            <div className="bg-zinc-800 rounded-xl p-6 border border-zinc-700">
-              <h3 className="text-lg font-semibold text-amber-400 mb-4">Switch User Identity</h3>
-              <p className="text-zinc-400 mb-4">Clear all memories and start fresh with a new user identity.</p>
-              <div className="flex gap-3">
+            <div className="border-t border-zinc-700 p-4">
+              <div className="flex space-x-2">
                 <input
                   type="text"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="Enter new user name"
-                  className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-white placeholder-zinc-400"
-                  onKeyDown={(e) => e.key === 'Enter' && switchUser()}
+                  placeholder="Type your message..."
+                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const input = e.target as HTMLInputElement;
+                      sendMessage(input.value);
+                      input.value = '';
+                    }
+                  }}
                 />
-                <button 
-                  onClick={switchUser}
-                  disabled={!newUserName.trim()}
-                  className="bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-600 text-white px-6 py-2 rounded-lg font-medium transition-all"
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    isRecording
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
-                  Switch
+                  {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </button>
               </div>
             </div>
           </div>
         );
-      
+
+      case 'voice':
+        return (
+          <div className="p-6">
+            <div className="text-center">
+              <div className="mb-8">
+                <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-6 transition-all ${
+                  isRecording ? 'bg-red-100 animate-pulse' : 'bg-zinc-800'
+                }`}>
+                  <Mic className={`w-16 h-16 ${isRecording ? 'text-red-600' : 'text-zinc-400'}`} />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {isRecording ? 'Recording...' : 'Voice Recording'}
+                </h2>
+                <p className="text-zinc-400 mb-6">
+                  {isRecording ? 'Speak now, click stop when finished' : 'Click to start recording your voice'}
+                </p>
+              </div>
+
+              <button
+                onClick={isRecording ? stopRecording : startRecording}
+                className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all ${
+                  isRecording
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isRecording ? 'Stop Recording' : 'Start Recording'}
+              </button>
+
+              {transcript && (
+                <div className="mt-8 p-4 bg-zinc-800 rounded-lg">
+                  <h3 className="text-lg font-semibold text-white mb-2">Latest Recording:</h3>
+                  <p className="text-zinc-300">{transcript}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'insights':
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">AI Insights</h2>
+            <div className="grid gap-4">
+              <div className="bg-zinc-800 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Conversation Patterns</h3>
+                <p className="text-zinc-400">You've sent {messages.filter(m => m.sender === 'user').length} messages so far.</p>
+              </div>
+              <div className="bg-zinc-800 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Voice Activity</h3>
+                <p className="text-zinc-400">{transcript ? 'Voice recording detected!' : 'No voice recordings yet.'}</p>
+              </div>
+              <div className="bg-zinc-800 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Engagement Level</h3>
+                <p className="text-zinc-400">Active conversation in progress.</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'knowledge':
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Knowledge Base</h2>
+            <div className="space-y-4">
+              <div className="bg-zinc-800 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Recent Topics</h3>
+                <ul className="text-zinc-400 space-y-1">
+                  <li>• Voice recognition and transcription</li>
+                  <li>• AI conversation patterns</li>
+                  <li>• React development</li>
+                  <li>• Personal reflection techniques</li>
+                </ul>
+              </div>
+              <div className="bg-zinc-800 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Saved Insights</h3>
+                <p className="text-zinc-400">Your conversations are helping build a personalized knowledge base.</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'profile':
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Profile</h2>
+            <div className="bg-zinc-800 p-6 rounded-lg">
+              <div className="flex items-center mb-4">
+                <div className="w-16 h-16 bg-zinc-700 rounded-full flex items-center justify-center">
+                  <User className="w-8 h-8 text-zinc-400" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-xl font-semibold text-white">Reflective User</h3>
+                  <p className="text-zinc-400">Active learner & thinker</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-zinc-400">Total Messages</p>
+                  <p className="text-white font-semibold">{messages.length}</p>
+                </div>
+                <div>
+                  <p className="text-zinc-400">Voice Recordings</p>
+                  <p className="text-white font-semibold">{transcript ? '1+' : '0'}</p>
+                </div>
+                <div>
+                  <p className="text-zinc-400">Sessions</p>
+                  <p className="text-white font-semibold">1</p>
+                </div>
+                <div>
+                  <p className="text-zinc-400">Status</p>
+                  <p className="text-green-400 font-semibold">Active</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
-        return <ChatWindow messages={messages} onSendMessage={sendMessage} loading={loading} />;
+        return <div className="p-6 text-white">Section not found</div>;
     }
   };
 
   return (
-    <div className="flex h-screen bg-zinc-900 text-zinc-100">
-      <Sidebar 
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        onTestTTS={testBrowserTTS}
-      />
-      <div className="flex flex-col flex-1">
-        <Topbar botStats={botStats} />
-        <main className="flex-1 overflow-hidden">
-          {renderMainContent()}
-        </main>
+    <div className="flex h-screen bg-zinc-900 text-white">
+      {/* Sidebar */}
+      <div className="w-20 bg-zinc-800 border-r border-zinc-700 flex flex-col items-center py-6 space-y-4">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id)}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-110 ${
+              activeSection === section.id
+                ? 'bg-blue-600 shadow-lg shadow-blue-600/20'
+                : 'bg-zinc-700 hover:bg-zinc-600'
+            }`}
+            title={section.label}
+          >
+            <span className="text-2xl">{section.emoji}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Bar */}
+        <div className="h-16 bg-zinc-800 border-b border-zinc-700 flex items-center justify-between px-6">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-xl font-bold">Reflectibot</h1>
+            <div className="text-sm text-zinc-400 capitalize">
+              {sections.find(s => s.id === activeSection)?.label}
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-sm text-zinc-400">Demo Mode</span>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden">
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
 };
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppComponent />
-    </QueryClientProvider>
-  );
-}
 
 export default App;

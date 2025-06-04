@@ -2,6 +2,13 @@ import type { Express, Request, Response } from "express";
 import multer from 'multer';
 import { storage } from "./storage.js";
 import { OpenAI } from "openai";
+import { getReflectibotPrompt } from './utils/promptUtils.js';
+import { analyzeUserMessage } from './utils/personalityUtils.js';
+import { updateUserStyleAndGetPrompt } from './services/userStyleService.js';
+
+// Polyfills for fetch, FormData, and Blob in Node.js
+import fetch, { Blob } from 'node-fetch';
+import FormData from 'form-data';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -28,45 +35,78 @@ function extractKeywords(text: string): string[] {
 }
 
 // Generate AI response
-async function generateResponse(userMessage: string, botId: number, userId: number): Promise<string> {
+async function generateResponse(userMessage: string, botId: number, userId: number, stylePrompt?: string): Promise<string> {
   try {
     const memories = await storage.getUserMemories(userId);
     const facts = await storage.getUserFacts(userId);
     const learnedWords = await storage.getLearnedWords(botId);
-    
+    const personality = analyzeUserMessage(userMessage);
     const stage = getStageFromWordCount(learnedWords.length);
-    const memoryContext = memories.slice(-5).map(m => m.memory).join('\n');
-    const factContext = facts.map(f => f.fact).join('\n');
-    
-    const systemPrompt = `You are Reflectibot, an AI companion in the "${stage}" learning stage.
 
-Your knowledge:
-Facts: ${factContext || 'None yet'}
-Recent memories: ${memoryContext || 'None yet'}
-Words learned: ${learnedWords.length}
+    const systemPrompt = getReflectibotPrompt({
+      factContext: facts.map(f => f.fact).join('\n'),
+      memoryContext: memories.map(m => m.memory).join('\n'),
+      stage,
+      learnedWordCount: learnedWords.length,
+      personality: personality?.tone ? { tone: personality.tone } : { tone: "neutral" }
+    });
 
-Respond naturally according to your developmental stage.`;
+    const promptWithStyle = `${stylePrompt || ''}\n\n${systemPrompt}`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: promptWithStyle },
         { role: "user", content: userMessage }
       ],
       max_tokens: 150,
     });
 
-    return response.choices[0].message?.content || "Sorry, I'm not sure how to respond.";
-  } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "I'm having trouble generating a response right now.";
-  }
+  return response.choices[0].message?.content || "Sorry, I'm not sure how to respond.";
+} catch (error) {
+  console.error("Error generating AI response:", error);
+  return "I'm having trouble generating a response right now.";
 }
+}
+
 
 export function registerRoutes(app: Express): void {
   // Simple test endpoint
   app.get('/api/test', (req: Request, res: Response) => {
     res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
+  });
+
+  // Test OpenAI connection
+  app.get('/api/test-openai', async (req: Request, res: Response) => {
+    try {
+      console.log('Testing OpenAI connection...');
+      console.log('API Key present:', !!process.env.OPENAI_API_KEY);
+      console.log('API Key format:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+      console.log('Analyzing style profile...');
+
+      const userId = parseInt(req.query.userId as string) || 1; // Default userId to 1 if not provided
+      const { message } = req.query;
+      const stylePrompt = await updateUserStyleAndGetPrompt(userId.toString(), message as string);
+      
+      // Test with a simple completion
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Say hello" }],
+        max_tokens: 10
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'OpenAI connection working',
+        response: response.choices[0].message?.content 
+      });
+    } catch (error) {
+      console.error('OpenAI test error:', error);
+      res.status(500).json({ 
+        error: 'OpenAI test failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   });
 
   // Setup endpoint to create database tables
@@ -95,7 +135,7 @@ export function registerRoutes(app: Express): void {
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
       console.log('Chat request received:', req.body);
-      const { message, userId = 1 } = req.body;
+      const { message, userId = 1, stylePrompt } = req.body;
 
       if (!message) {
         res.status(400).json({ error: 'message required' });
@@ -124,7 +164,7 @@ export function registerRoutes(app: Express): void {
 
       // Generate AI response
       console.log('Generating AI response...');
-      const aiResponse = await generateResponse(message, bot.id, userId);
+      const aiResponse = await generateResponse(message, bot.id, userId, stylePrompt);
       console.log('AI response generated:', aiResponse);
 
       // Store bot response
@@ -302,33 +342,60 @@ export function registerRoutes(app: Express): void {
   // OpenAI Whisper transcription endpoint
   app.post('/api/transcribe', upload.single('audio'), async (req: Request, res: Response) => {
     try {
+      console.log('Transcription request received');
+      
       if (!req.file) {
+        console.log('No audio file received');
         res.status(400).json({ error: 'Audio file is required' });
         return;
       }
 
+      console.log('Audio file received:', {
+        originalname: req.file.originalname,
+      });
+
+      // Create form data for OpenAI API
       const formData = new FormData();
-      formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), 'audio.webm');
+      
+      // Append buffer directly as file to form data
+      formData.append('file', req.file.buffer, {
+        filename: req.file.originalname || 'audio.webm',
+        contentType: req.file.mimetype || 'audio/webm'
+      });
       formData.append('model', 'whisper-1');
+      formData.append('language', 'en'); // Optional: specify language
+
+      console.log('Sending request to OpenAI Whisper API...');
 
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          ...formData.getHeaders()
         },
         body: formData
       });
 
+      console.log('OpenAI API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`OpenAI Whisper API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('OpenAI API error response:', errorText);
+        throw new Error(`OpenAI Whisper API error: ${response.status} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { text: string };
+      console.log('Transcription successful:', result.text);
+      
       res.json({ text: result.text });
 
     } catch (error) {
       console.error('Transcription error:', error);
-      res.status(500).json({ error: 'Transcription failed' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown transcription error';
+      res.status(500).json({ 
+        error: 'Transcription failed',
+        details: errorMessage
+      });
     }
   });
 }

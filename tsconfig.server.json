@@ -11,6 +11,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "server",
-    "noEmit": false
+    "noEmit": false,
+    "module": "commonjs",
+    "target": "es2019",
+    "esModuleInterop": true
   }
 }
