@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "AI Memory Companion Bot",
   "main": "dist/server/index.js",
-  "type": "module",
   "scripts": {
     "build": "npm run build:server && npm run build:client",
     "build:server": "npx tsc",
@@ -29,6 +28,8 @@
     "@types/express": "^5.0.0",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

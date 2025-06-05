@@ -1,20 +1,10 @@
-export function updateUserStyleAndGetPrompt({
-  recentMessages,
-  previousStyle
-}: {
-  recentMessages: string[];
-  previousStyle: string;
-}): string {
-  // ✨ Basic placeholder logic
-  const joined = recentMessages.join(' ').toLowerCase();
+// services/userStyleService.ts
 
-  if (joined.includes("bro") || joined.includes("dude")) {
-    return "surfer";
-  }
+import { storage } from '../storage';
 
-  if (joined.includes("indeed") || joined.includes("however")) {
-    return "formal";
-  }
-
-  return previousStyle || "neutral";
+export async function updateUserStyleAndGetPrompt(userId: number, recentMessages: string[]): Promise<string> {
+  // Here you could run some real tone detection — for now we just return a dummy style.
+  const tone = 'neutral';
+  await storage.setUserStylePrompt(userId, tone);
+  return tone;
 }

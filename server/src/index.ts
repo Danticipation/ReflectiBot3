@@ -1,11 +1,11 @@
 // server/index.ts
 import 'dotenv/config';
-import { registerSwaggerDocs } from './swagger';
+import { registerSwaggerDocs } from './swagger.js';
 import express, { Express, Request, Response } from 'express';
 import path from 'path';
 // Make sure the routes file exists at ./routes.ts or ./routes/index.ts
 // If it does not exist, create it with at least the following content:
-import { registerRoutes } from './routes';
+import { registerRoutes } from './routes/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;

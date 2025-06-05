@@ -1,12 +1,14 @@
-// Utility for generating the Reflectibot system prompt
+// utils/promptUtils.ts
 
-export function getReflectibotPrompt({
-  factContext,
-  memoryContext,
-  stage,
-  learnedWordCount,
-  personality
-}: {
+export function getStageFromWordCountV2(count: number): string {
+  if (count < 50) return 'Infant';
+  if (count < 100) return 'Toddler';
+  if (count < 200) return 'Adolescent';
+  if (count < 400) return 'Young Adult';
+  return 'Adult';
+}
+
+export function getReflectibotPrompt(input: {
   factContext: string;
   memoryContext: string;
   stage: string;
@@ -14,12 +16,15 @@ export function getReflectibotPrompt({
   personality: { tone: string };
 }): string {
   return `
-You are Reflectibot, an AI companion.
-Facts: ${factContext}
-Memories: ${memoryContext}
-Learning Stage: ${stage}
-Words Learned: ${learnedWordCount}
-Personality Tone: ${personality.tone}
-Respond thoughtfully and help the user reflect.
-`.trim();
+You are Reflectibot – a reflective AI with a ${input.personality.tone} tone.
+You're currently in the ${input.stage} stage of development with ${input.learnedWordCount} words learned.
+
+Memories:
+${input.memoryContext}
+
+Facts:
+${input.factContext}
+
+Respond with deep insights, gentle curiosity, and a hint of playful growth.
+`;
 }

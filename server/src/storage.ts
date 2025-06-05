@@ -30,4 +30,9 @@ export const storage = {
   },
 
   async setupTables() {},
+  async setUserStylePrompt(userId: number, style: string): Promise<void> {
+    // Implement your preferred storage — this is a stub.
+    console.log(`Set style prompt for user ${userId} to: ${style}`);
+    return Promise.resolve();
+  },
 };

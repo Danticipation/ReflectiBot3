@@ -1,4 +1,4 @@
-// src/swagger.ts
+// swagger.ts
 import swaggerJsDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import type { Express } from 'express';
@@ -7,21 +7,17 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'ReflectiBot API',
+      title: 'Reflectibot API',
       version: '1.0.0',
-      description: 'Voice-enabled AI companion API',
+      description: 'API docs for the Reflectibot companion system'
     },
-    servers: [
-      {
-        url: 'http://localhost:3000/api',
-      },
-    ],
+    servers: [{ url: 'http://localhost:3000' }]
   },
-  apis: ['./src/routes/*.ts'], // Files with Swagger comments
+  apis: ['./src/routes/*.ts', './src/controllers/*.ts', './src/routes.ts', './src/index.ts'],
 };
 
 const specs = swaggerJsDoc(options);
 
 export function registerSwaggerDocs(app: Express): void {
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
 }

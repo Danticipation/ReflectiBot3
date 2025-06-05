@@ -1,45 +1,35 @@
 // services/responseService.ts
-import { OpenAI } from 'openai';
+
+import { getReflectibotPrompt, getStageFromWordCountV2 } from '../utils/promptUtils';
 import { storage } from '../storage';
-import { getReflectibotPrompt } from '../utils/promptUtils';
+import { OpenAI } from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI();
 
-interface GenerateResponseOptions {
-  message: string;
-  userId: number;
-  botId: number;
-  stylePrompt?: string;
-}
+type Fact = { fact: string };
+type Memory = { memory: string };
 
-export async function generateResponseWithStyle({
-  message,
-  userId,
-  botId,
-  stylePrompt
-}: GenerateResponseOptions): Promise<string> {
-  const memories: { memory: string }[] = await storage.getUserMemories(userId);
-  const facts: { fact: string }[] = await storage.getUserFacts(userId);
+export async function generateResponseWithStyle(userId: number, botId: number, userInput: string): Promise<string> {
+  const facts: Fact[] = await storage.getUserFacts(userId);
+  const memories: Memory[] = await storage.getUserMemories(userId);
   const learnedWords = await storage.getLearnedWords(botId);
+  const stage = getStageFromWordCountV2(learnedWords.length);
 
   const systemPrompt = getReflectibotPrompt({
     factContext: facts.map(f => f.fact).join('\n'),
-    memoryContext: Array.isArray(memories) ? memories.map(m => m.memory).join('\n') : '',
-    stage: 'Adolescent',
+    memoryContext: memories.map(m => m.memory).join('\n'),
+    stage,
     learnedWordCount: learnedWords.length,
-    personality: { tone: 'neutral' }
+    personality: { tone: 'neutral' },
   });
 
-  const prompt = `${stylePrompt || ''}\n\n${systemPrompt}`;
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+  const completion = await openai.chat.completions.create({
     messages: [
-      { role: 'system', content: prompt },
-      { role: 'user', content: message }
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userInput }
     ],
-    max_tokens: 150
+    model: 'gpt-4o'
   });
 
-  return response.choices[0].message?.content || 'Sorry, I’m not sure how to respond.';
+  return completion.choices[0].message.content || '[No response generated]';
 }

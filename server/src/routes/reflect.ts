@@ -39,19 +39,16 @@ export function registerReflectRoutes(app: Express): void {
     const previousStyle = 'neutral';                        // or from DB
 
     // ✨ Detect user tone
-    const tone = updateUserStyleAndGetPrompt({
-      recentMessages: memories,
-      previousStyle,
-    });
+    const message = "default message"; // 🔧 Replace with actual message logic
+    const tone = await updateUserStyleAndGetPrompt(userId, memories);
 
-    const personality = { tone };
-
+    const personality = { tone }; // Ensure 'tone' is properly initialized above
     const systemPrompt = getReflectibotPrompt({
       factContext: facts.join('\n'),
       memoryContext: memories.join('\n'),
       stage,
       learnedWordCount,
-      personality,
+      personality: { tone },
     });
 
     res.json({

@@ -4,11 +4,10 @@ import { generateResponseWithStyle } from '../services/responseService';
 import { storage } from '../storage';
 
 export async function handleChatRequest(req: Request, res: Response) {
-  const { message, userId, botId } = req.body;
+  const { message, userId, botId, stylePrompt } = req.body;
 
   try {
-    const stylePrompt = await storage.getUserStylePrompt(userId);
-    const reply = await generateResponseWithStyle({ message, userId, botId, stylePrompt });
+    const reply = await generateResponseWithStyle(userId, botId, message);
     res.json({ success: true, message: reply });
   } catch (error) {
     console.error('Chat error:', error);

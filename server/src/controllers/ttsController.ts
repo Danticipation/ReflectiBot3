@@ -5,7 +5,7 @@ import fetch from 'node-fetch';
 export async function handleTTSRequest(req: Request, res: Response): Promise<void> {
   try {
     const { text, voiceId = 'iCrDUkL56s3C8sCRl7wb' } = req.body;
-    if (!text) return res.status(400).json({ error: 'Text is required' });
+    if (!text) res.status(400).json({ error: 'Text is required' });
 
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',

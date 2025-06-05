@@ -1,7 +1,7 @@
 // controllers/statsController.ts
 import { Request, Response } from 'express';
 import { storage } from '../storage';
-import { getStageFromWordCount } from '../utils/promptUtils';
+import { getStageFromWordCountV2 } from '../utils/promptUtils';
 
 export async function handleStatsRequest(req: Request, res: Response): Promise<void> {
   try {
@@ -14,7 +14,7 @@ export async function handleStatsRequest(req: Request, res: Response): Promise<v
 
     const words = await storage.getLearnedWords(bot.id);
     const messages = await storage.getUserMemories(Number(userId));
-    const stage = getStageFromWordCount(words.length);
+    const stage = getStageFromWordCountV2(words.length);
 
     res.json({ stage, wordCount: words.length, messageCount: messages.length });
   } catch (error) {
