@@ -5,7 +5,7 @@ import {
   type User, type InsertUser, type Bot, type InsertBot, type Message, type InsertMessage,
   type LearnedWord, type InsertLearnedWord, type Milestone, type InsertMilestone,
   type UserMemory, type InsertUserMemory, type UserFact, type InsertUserFact
-} from '../shared/schema';
+} from './schema';
 import { eq, and } from 'drizzle-orm';
 
 // Initialize database connection
@@ -40,7 +40,7 @@ ensureTables(); // Ensure tables are checked on module load
 export const storage = {
   // Setup tables method
   async setupTables(): Promise<void> {
-    const createUsersTable = `
+    const createUsersTable = sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) NOT NULL UNIQUE,
@@ -50,7 +50,7 @@ export const storage = {
       )
     `;
 
-    const createBotsTable = `
+    const createBotsTable = sql`
       CREATE TABLE IF NOT EXISTS bots (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
@@ -63,7 +63,7 @@ export const storage = {
       )
     `;
 
-    const createMessagesTable = `
+    const createMessagesTable = sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         bot_id INTEGER REFERENCES bots(id),
@@ -73,7 +73,7 @@ export const storage = {
       )
     `;
 
-    const createLearnedWordsTable = `
+    const createLearnedWordsTable = sql`
       CREATE TABLE IF NOT EXISTS learned_words (
         id SERIAL PRIMARY KEY,
         bot_id INTEGER REFERENCES bots(id),
@@ -84,7 +84,7 @@ export const storage = {
       )
     `;
 
-    const createMilestonesTable = `
+    const createMilestonesTable = sql`
       CREATE TABLE IF NOT EXISTS milestones (
         id SERIAL PRIMARY KEY,
         bot_id INTEGER REFERENCES bots(id),
@@ -94,7 +94,7 @@ export const storage = {
       )
     `;
 
-    const createUserMemoriesTable = `
+    const createUserMemoriesTable = sql`
       CREATE TABLE IF NOT EXISTS user_memories (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
@@ -105,7 +105,7 @@ export const storage = {
       )
     `;
 
-    const createUserFactsTable = `
+    const createUserFactsTable = sql`
       CREATE TABLE IF NOT EXISTS user_facts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
@@ -116,20 +116,20 @@ export const storage = {
       )
     `;
 
-    const insertDefaultUser = `
+    const insertDefaultUser = sql`
       INSERT INTO users (username, email) VALUES ('default_user', 'user@example.com') 
       ON CONFLICT (username) DO NOTHING
     `;
 
     // Execute all table creation queries
-    await sql(createUsersTable);
-    await sql(createBotsTable);
-    await sql(createMessagesTable);
-    await sql(createLearnedWordsTable);
-    await sql(createMilestonesTable);
-    await sql(createUserMemoriesTable);
-    await sql(createUserFactsTable);
-    await sql(insertDefaultUser);
+    await sql`${createUsersTable}`;
+    await sql`${createBotsTable}`;
+    await sql`${createMessagesTable}`;
+    await sql`${createLearnedWordsTable}`;
+    await sql`${createMilestonesTable}`;
+    await sql`${createUserMemoriesTable}`;
+    await sql`${createUserFactsTable}`;
+    await sql`${insertDefaultUser}`;
   },
   // User operations
   async getUser(id: number): Promise<User | undefined> {

@@ -1,13 +1,27 @@
+import ChatWindow from './components/ChatWindow';
+
+function App() {
+  return (
+    <div className="h-screen w-screen bg-black text-white">
+      <ChatWindow />
+    </div>
+  );
+}
+
+export { App as MainApp };
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Brain, BookOpen, Mic, User, MicOff, Square } from 'lucide-react';
 
-const App: React.FC = () => {
+const AppLayout: React.FC = () => {
   const [activeSection, setActiveSection] = useState('chat');
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [messages, setMessages] = useState<Array<{id: string, text: string, sender: 'user' | 'ai'}>>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const [input, setInput] = useState('');
 
   const sections = [
     { id: 'chat', icon: MessageCircle, label: 'Chat', emoji: '💬' },
@@ -51,6 +65,14 @@ const App: React.FC = () => {
     }
   };
 
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   const sendAudioToWhisper = async (audioBlob: Blob) => {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'recording.wav');
@@ -89,65 +111,68 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'chat':
-        return (
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.length === 0 ? (
-                <div className="text-center text-zinc-400 mt-20">
-                  <MessageCircle className="w-16 h-16 mx-auto mb-4 text-zinc-600" />
-                  <h3 className="text-xl font-semibold mb-2">Start a conversation</h3>
-                  <p>Ask me anything or use voice recording to get started!</p>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-sm px-4 py-2 rounded-lg ${
-                        message.sender === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-zinc-700 text-zinc-100'
-                      }`}
-                    >
-                      {message.text}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="border-t border-zinc-700 p-4">
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="Type your message..."
-                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      const input = e.target as HTMLInputElement;
-                      if (input.value.trim()) {
-                        addMessage(input.value, 'user');
-                        input.value = '';
-                      }
-                    }
-                  }}
-                />
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    isRecording
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                </button>
+          case 'chat':
+      return (
+        <div className="flex flex-col h-full relative p-4">
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`p-3 max-w-[75%] rounded-2xl shadow ${
+                  msg.sender === 'user'
+                    ? 'ml-auto bg-blue-600 text-white'
+                    : 'mr-auto bg-gray-200 text-black'
+                }`}
+              >
+                {msg.text}
               </div>
-            </div>
+            ))}
           </div>
-        );
+
+          {/* Voice status or recording animation */}
+          {isRecording && (
+            <div className="absolute bottom-28 left-1/2 transform -translate-x-1/2 text-sm text-pink-600 animate-pulse">
+              Listening...
+            </div>
+          )}
+
+          {/* Button grid */}
+          <div className="grid grid-cols-3 gap-2 mt-4 text-xs">
+            <button className="bg-purple-200 hover:bg-purple-300 p-2 rounded-xl shadow">📈 Stats</button>
+            <button className="bg-green-200 hover:bg-green-300 p-2 rounded-xl shadow">🌱 Growth</button>
+            <button className="bg-yellow-200 hover:bg-yellow-300 p-2 rounded-xl shadow">🧠 Reflect</button>
+            <button className="bg-red-200 hover:bg-red-300 p-2 rounded-xl shadow">📚 Facts</button>
+            <button className="bg-blue-200 hover:bg-blue-300 p-2 rounded-xl shadow">🔤 Words</button>
+            <button className="bg-gray-200 hover:bg-gray-300 p-2 rounded-xl shadow">🔄 Switch</button>
+          </div>
+
+          {/* Input + Mic */}
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              type="text"
+              className="flex-1 p-3 rounded-2xl border border-gray-300 shadow focus:outline-none"
+              placeholder="Type your message..."
+              value={input}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && input.trim()) {
+                  addMessage(input, 'user');
+                  setInput('');
+                }
+              }}
+            />
+            <button
+              onClick={toggleRecording}
+              className={`p-3 rounded-full shadow ${
+                isRecording ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'
+              }`}
+            >
+              🎤
+            </button>
+          </div>
+        </div>
+      );
+
 
       case 'voice':
         return (
@@ -307,4 +332,5 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default AppLayout;
+export { App };

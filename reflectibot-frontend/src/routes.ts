@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 import { getReflectibotPrompt } from './utils/promptUtils.js';
 import { analyzeUserMessage } from './utils/personalityUtils.js';
-import { updateUserStyleAndGetPrompt } from './services/userStyleService.js';
+import updateUserStyleAndGetPrompt from './userStyleService.js';
 
 // Polyfills for fetch, FormData, and Blob in Node.js
 import fetch, { Blob } from 'node-fetch';
@@ -86,7 +86,7 @@ export function registerRoutes(app: Express): void {
 
       const userId = parseInt(req.query.userId as string) || 1; // Default userId to 1 if not provided
       const { message } = req.query;
-      const stylePrompt = await updateUserStyleAndGetPrompt(userId.toString(), message as string);
+      const stylePrompt = await updateUserStyleAndGetPrompt(userId.toString());
       
       // Test with a simple completion
       const response = await openai.chat.completions.create({

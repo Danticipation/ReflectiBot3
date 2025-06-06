@@ -5,15 +5,16 @@ export async function setupVite(app: Express, server: Server): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     // In production, serve static files
     const path = await import('path');
-    app.use('/', (await import('express')).static(path.join(process.cwd(), 'dist')));
-    
-    // Serve React app for all non-API routes
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-      }
-    });
-  } else {
+app.use('/', (await import('express')).static(path.join(process.cwd(), 'dist')));
+
+// Serve React app for all non-API routes
+app.get('*', async (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    const path = await import('path');
+    res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+  }
+});
+} else {
     // In development, you can add Vite dev server setup here
     console.log('Development mode - add Vite dev server configuration if needed');
     

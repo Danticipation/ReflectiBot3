@@ -1,7 +1,35 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true, // Ensures strict type-checking rules are applied
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [], // Specify type definitions explicitly if needed
+    "outDir": "./dist",
+    "rootDir": "./",
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "./src/**/*",
+    "./server/**/*",
+    "./shared/**/*",
+    "./**/*.ts",
+    "./**/*.tsx",
+    "./**/*.json"
+  ],
+  "exclude": [
+    "./node_modules",
+    "./dist"
   ]
 }

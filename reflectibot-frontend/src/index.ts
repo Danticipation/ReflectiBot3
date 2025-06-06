@@ -4,12 +4,12 @@ dotenv.config();
 import express, { Express } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerRoutes } from './routes.js';
+import { registerRoutes } from './routes';
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);  
 const __dirname = path.dirname(__filename);
 
 // Middleware

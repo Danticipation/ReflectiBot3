@@ -1,7 +1,7 @@
 // server/api.ts
 
 import { Express, Request, Response } from "express";
-import { storage } from "./storage.ts";
+import { storage } from "./storage.js";
 import { OpenAI } from "openai";
 
 const openai = new OpenAI({
